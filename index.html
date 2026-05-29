@@ -217,9 +217,12 @@
             <h2 class="text-2xl text-white mb-8 tracking-widest uppercase font-bold mc-font-pixel" style="text-shadow: 4px 4px 0px #000;">
                 Generiere Welt...
             </h2>
-            <div class="w-full max-w-md h-8 bg-neutral-800 border-4 border-[#3c3c3c] rounded-sm p-1">
-                <div id="loading-bar-fill" class="h-full bg-green-600 transition-all duration-100" style="width: 0%"></div>
+            <div class="w-full max-w-md h-8 bg-neutral-800 border-4 border-[#3c3c3c] rounded-sm p-1 relative">
+                <div id="loading-bar-fill" class="h-full bg-green-600 transition-all duration-100" style="width: 0%">
+                </div>
+                <div id="loading-percent" class="absolute inset-0 flex items-center justify-center text-xs font-bold mc-font-pixel">0%</div>
             </div>
+            <p id="loading-eta" class="mt-2 text-sm text-yellow-500 font-mono italic">Berechne Zeit...</p>
             <p id="loading-status" class="mt-4 text-xl tracking-wide text-neutral-400 font-semibold uppercase">
                 Lade Terrains...
             </p>
@@ -377,6 +380,11 @@
                 return val - Math.floor(val);
             }
 
+            random3D(x, y, z) {
+                let val = Math.sin(x * 12.9898 + y * 45.164 + z * 78.233 + this.seed) * 43758.5453123;
+                return val - Math.floor(val);
+            }
+
             noise(x, z) {
                 const xi = Math.floor(x);
                 const zi = Math.floor(z);
@@ -397,6 +405,38 @@
                 return top + v * (bot - top);
             }
 
+            noise3D(x, y, z) {
+                const xi = Math.floor(x);
+                const yi = Math.floor(y);
+                const zi = Math.floor(z);
+                const xf = x - xi;
+                const yf = y - yi;
+                const zf = z - zi;
+
+                const u = xf * xf * (3.0 - 2.0 * xf);
+                const v = yf * yf * (3.0 - 2.0 * yf);
+                const w = zf * zf * (3.0 - 2.0 * zf);
+
+                const r000 = this.random3D(xi, yi, zi);
+                const r100 = this.random3D(xi + 1, yi, zi);
+                const r010 = this.random3D(xi, yi + 1, zi);
+                const r110 = this.random3D(xi + 1, yi + 1, zi);
+                const r001 = this.random3D(xi, yi, zi + 1);
+                const r101 = this.random3D(xi + 1, yi, zi + 1);
+                const r011 = this.random3D(xi, yi + 1, zi + 1);
+                const r111 = this.random3D(xi + 1, yi + 1, zi + 1);
+
+                const x00 = r000 + u * (r100 - r000);
+                const x10 = r010 + u * (r110 - r010);
+                const x01 = r001 + u * (r101 - r001);
+                const x11 = r011 + u * (r111 - r011);
+
+                const y0 = x00 + v * (x10 - x00);
+                const y1 = x01 + v * (x11 - x01);
+
+                return y0 + w * (y1 - y0);
+            }
+
             fbm(x, z, octaves = 3) {
                 let total = 0;
                 let amplitude = 1;
@@ -410,6 +450,20 @@
                     frequency *= 2;
                 }
 
+                return total / maxValue;
+            }
+
+            fbm3D(x, y, z, octaves = 2) {
+                let total = 0;
+                let amplitude = 1;
+                let frequency = 1;
+                let maxValue = 0;
+                for (let i = 0; i < octaves; i++) {
+                    total += this.noise3D(x * frequency, y * frequency, z * frequency) * amplitude;
+                    maxValue += amplitude;
+                    amplitude *= 0.5;
+                    frequency *= 2;
+                }
                 return total / maxValue;
             }
         }
@@ -463,6 +517,8 @@
                     } else if (type === 'water') {
                         noise = Math.sin(x * 0.5) * 15;
                         noise = Math.sin(x * 0.5) * 10 + Math.cos(y * 0.5) * 10;
+                        // Flaches blaues Wasser ohne Rauschen für besseren Look
+                        noise = 0;
                     }
 
                     const nr = Math.max(0, Math.min(255, rgb.r + noise));
@@ -544,7 +600,10 @@
                 14: 0,
                 15: 0,
                 16: 0,
-                17: 0
+                17: 0,
+                18: 0, // Kohle
+                19: 0, // Eisen
+                20: 0  // Gold
             },
             username: "Steve",
             sessionId: "OFFLINE",
@@ -775,7 +834,10 @@
             { id: 14, name: "Wasser",       textureName: "wasser",      miningTime: Infinity, transparent: true, fluid: true, color: '#3355ff', textures: ['#3355ff','#3355ff','#3355ff','#3355ff','#3355ff','#3355ff'], types: ['water','water','water','water','water','water'] },
             { id: 15, name: "Lava",         textureName: "lava",        miningTime: Infinity, transparent: true, fluid: true, color: '#ff3300', textures: ['#ff3300','#ff3300','#ff3300','#ff3300','#ff3300','#ff3300'], types: ['dirt','dirt','dirt','dirt','dirt','dirt'] },
             { id: 16, name: "Stöcke",       textureName: "stocke",      miningTime: 0.1,  transparent: false, color: '#7a5a3a', textures: ['#7a5a3a','#7a5a3a','#7a5a3a','#7a5a3a','#7a5a3a','#7a5a3a'], types: ['dirt','dirt','dirt','dirt','dirt','dirt'] },
-            { id: 17, name: "Werkbank",     textureName: "werkbank",    miningTime: 3.75, transparent: false, color: '#7a5a3a', textures: ['#7a5a3a','#7a5a3a','#9c794a','#9c794a','#7a5a3a','#7a5a3a'], types: ['stone','stone','dirt','dirt','stone','stone'] }
+            { id: 17, name: "Werkbank",     textureName: "werkbank",    miningTime: 3.75, transparent: false, color: '#7a5a3a', textures: ['#7a5a3a','#7a5a3a','#9c794a','#9c794a','#7a5a3a','#7a5a3a'], types: ['stone','stone','dirt','dirt','stone','stone'] },
+            { id: 18, name: "Kohleerz",     textureName: "kohle",       miningTime: 15.0, transparent: false, color: '#222222', textures: ['#737373','#737373','#737373','#737373','#737373','#737373'], types: ['stone','stone','stone','stone','stone','stone'] },
+            { id: 19, name: "Eisenerz",     textureName: "eisen",       miningTime: 25.0, transparent: false, color: '#d8af93', textures: ['#737373','#737373','#737373','#737373','#737373','#737373'], types: ['stone','stone','stone','stone','stone','stone'] },
+            { id: 20, name: "Golderz",      textureName: "gold",        miningTime: 40.0, transparent: false, color: '#fcee4b', textures: ['#737373','#737373','#737373','#737373','#737373','#737373'], types: ['stone','stone','stone','stone','stone','stone'] }
         ];
 
         const materialCache = {};
@@ -812,7 +874,8 @@
             const textureNames = [
                 'grasblock','erde','stein','pflasterstein','eichenholz','laub',
                 'holzblock','ziegelstein','glasblock','sand','kaktus','tnt',
-                'wasser','lava','stocke','werkbank'
+                'wasser','lava','stocke','werkbank',
+                'kohle', 'eisen', 'gold'
             ];
             
             const loader = new THREE.TextureLoader();
@@ -965,6 +1028,7 @@
             constructor(seed) {
                 this.noiseGen = new SeededNoise(seed);
                 this.detailNoise = new SeededNoise(seed + "_detail");
+                this.caveNoise = new SeededNoise(seed + "_caves");
             }
 
             getBiome(x, z) {
@@ -992,6 +1056,12 @@
                 const baseVal = this.noiseGen.fbm(gx * 0.01, gz * 0.01, 4);
                 const detail  = this.detailNoise.fbm(gx * 0.05, gz * 0.05, 2) * 2;
                 return Math.floor(baseVal * b.scale + b.heightOffset + detail);
+            }
+
+            isCave(gx, gy, gz) {
+                // Höhlen generieren nur unterhalb der Oberfläche
+                // Optimierung: Nur eine Ebene Noise statt FBM (spart 50% Rechenlast)
+                return this.caveNoise.noise3D(gx * 0.08, gy * 0.15, gz * 0.08) > 0.62;
             }
         }
 
@@ -1035,6 +1105,22 @@
                                 blockId = b.subBlock;
                             } else {
                                 blockId = 3; // Stein
+                            }
+                            
+                            // Höhlen-System Check
+                            if (y < finalHeight - 1 && y > 1) {
+                                if (game.noiseGen.isCave(gx, y, gz)) {
+                                    blockId = 0;
+                                } else if (blockId === 3) {
+                                    // Erze generieren (nur in Steinwänden)
+                                    const oreVal = game.noiseGen.caveNoise.fbm3D(gx * 0.2, y * 0.2, gz * 0.2, 1);
+                                    if (oreVal > 0.82) {
+                                        const typeVal = game.noiseGen.caveNoise.random3D(gx, y, gz);
+                                        if (y < 15 && typeVal > 0.96) blockId = 20;      // Gold (nur tief)
+                                        else if (y < 30 && typeVal > 0.88) blockId = 19; // Eisen
+                                        else if (typeVal > 0.75) blockId = 18;           // Kohle
+                                    }
+                                }
                             }
 
                             const coordinateKey = `${gx},${y},${gz}`;
@@ -1455,20 +1541,16 @@
             game.noiseGen  = new BiomeGenerator(game.worldSeed);
 
             RENDER_RADIUS = parseInt(document.getElementById('select-render-distance').value);
-
             await loadTexturesFromFolder();
             
             let sessId = document.getElementById('input-session-id').value.trim().toUpperCase();
-            if (!sessId) {
-                sessId = document.getElementById('input-session-id').placeholder;
-            }
+            if (!sessId) sessId = document.getElementById('input-session-id').placeholder;
             game.sessionId = sessId;
             game.isMultiplayerActive = true;
             game_gamemodes[game.playerId] = 'survival';
             
             document.getElementById('session-tag').innerText  = `SESSION: ${game.sessionId}`;
             document.getElementById('debug-key').innerText    = game.sessionId;
-
             document.getElementById('generating-screen').classList.remove('hidden');
 
             game.mpSession = new MultiplayerSession(game.sessionId);
@@ -1478,32 +1560,56 @@
             }
             listenToChat();
 
-            let progress = 0;
-            const interval = setInterval(() => {
-                progress += 20;
-                document.getElementById('loading-bar-fill').style.width = `${progress}%`;
-                
-                if (progress >= 100) {
-                    clearInterval(interval);
+            // ASYNCHRONES LADEN DER WELT
+            const chunkCoords = [];
+            for (let x = -RENDER_RADIUS; x <= RENDER_RADIUS; x++) {
+                for (let z = -RENDER_RADIUS; z <= RENDER_RADIUS; z++) {
+                    chunkCoords.push({ x, z });
+                }
+            }
+
+            const totalChunks = chunkCoords.length;
+            let loadedCount = 0;
+            const startTime = Date.now();
+
+            async function loadNextChunk() {
+                if (loadedCount < totalChunks) {
+                    const coord = chunkCoords[loadedCount];
+                    const key = `${coord.x},${coord.z}`;
+                    
+                    document.getElementById('loading-status').innerText = `Baue Chunk [${coord.x}, ${coord.z}]...`;
+                    
+                    if (!game.chunks[key]) {
+                        game.chunks[key] = new Chunk(coord.x, coord.z);
+                        game.chunks[key].rebuildMesh();
+                        scene.add(game.chunks[key].group);
+                    }
+
+                    loadedCount++;
+                    const percent = Math.floor((loadedCount / totalChunks) * 100);
+                    document.getElementById('loading-bar-fill').style.width = `${percent}%`;
+                    document.getElementById('loading-percent').innerText = `${percent}%`;
+
+                    // Zeitberechnung
+                    const elapsed = Date.now() - startTime;
+                    const timePerChunk = elapsed / loadedCount;
+                    const remaining = Math.ceil(((totalChunks - loadedCount) * timePerChunk) / 1000);
+                    document.getElementById('loading-eta').innerText = `Geschätzte Zeit: ${remaining}s`;
+
+                    // Gib dem Browser Zeit für UI-Updates
+                    setTimeout(loadNextChunk, 0);
+                } else {
+                    // Laden beendet
+                    document.getElementById('loading-status').innerText = "Initialisiere Spieler...";
                     
                     const spawnX = 0;
                     const spawnZ = 0;
                     let spawnHeight = Math.max(SEA_LEVEL + 2, game.noiseGen.getHeight(spawnX, spawnZ) + 2.5);
                     
-                    for (let y = spawnHeight; y < spawnHeight + 5; y++) {
-                        const checkBlock = getGlobalBlock(spawnX, y, spawnZ);
-                        if (checkBlock === 0) {
-                            spawnHeight = y;
-                            break;
-                        }
-                    }
-                    
                     camera.position.set(spawnX, spawnHeight, spawnZ);
                     player.velocity.set(0, 0, 0);
 
-                    // Erzwinge Chunk-Generierung für den Startbereich
-                    updateInfiniteChunks();
-
+                    // UI umschalten
                     document.getElementById('generating-screen').classList.add('hidden');
                     document.getElementById('canvas-container').classList.remove('hidden');
                     document.getElementById('hud-container').classList.remove('hidden');
@@ -1514,10 +1620,14 @@
 
                     container.requestPointerLock();
                     game.isWorldLoaded = true;
+                    game.playerChunk = { x: 0, z: 0 };
+
+                    generateStatHUDBars();
+                    drawHotbar();
                 }
-                generateStatHUDBars();
-                drawHotbar();
-            }, 150);
+            }
+
+            loadNextChunk();
         });
 
         resumeBtn.addEventListener('click', () => {
@@ -1607,7 +1717,11 @@
             if (e.code.startsWith('Digit')) {
                 const digitNum = parseInt(e.code.replace('Digit', ''));
                 if (digitNum >= 1 && digitNum <= 9) {
-                    selectHotbarSlot(digitNum - 1);
+                    const slotIdx = digitNum - 1;
+                    const bId = hotbarAssigned[slotIdx];
+                    const qty = game.inventory[bId] || 0;
+                    if (qty > 0 || game_gamemodes[game.playerId] === 'creative') selectHotbarSlot(slotIdx);
+                    else showNotification("Du hast diesen Block noch nicht!");
                 }
             }
 
@@ -1636,10 +1750,18 @@
 
         window.addEventListener('wheel', (e) => {
             if (!controls.isLocked) return;
-            let targetSlot = game.activeBlockIndex + (e.deltaY > 0 ? 1 : -1);
-            if (targetSlot < 0) targetSlot = 8;
-            if (targetSlot > 8) targetSlot = 0;
-            selectHotbarSlot(targetSlot);
+            
+            let nextSlot = game.activeBlockIndex;
+            const dir = e.deltaY > 0 ? 1 : -1;
+            for (let i = 0; i < 9; i++) {
+                nextSlot = (nextSlot + dir + 9) % 9;
+                const bId = hotbarAssigned[nextSlot];
+                const qty = game.inventory[bId] || 0;
+                if (qty > 0 || game_gamemodes[game.playerId] === 'creative') {
+                    selectHotbarSlot(nextSlot);
+                    break;
+                }
+            }
         });
 
         function updateMovementKeys() {
@@ -2274,42 +2396,57 @@
             hotbarEl.innerHTML = '';
             hotbarAssigned.forEach((blockId, index) => {
                 const block = BLOCKS.find(b => b.id === blockId);
+                const qty   = game.inventory[blockId] || 0;
+                const isCreative = game_gamemodes[game.playerId] === 'creative';
+                const hasItem = qty > 0 || isCreative;
+
                 const slot  = document.createElement('div');
                 
                 slot.className = `w-12 h-12 flex items-center justify-center cursor-pointer transition-all duration-75 relative mc-slot ${
                     index === game.activeBlockIndex ? 'mc-slot-active' : ''
                 }`;
-                slot.style.backgroundColor  = block ? block.color : 'rgba(0,0,0,0.5)';
-                slot.style.backgroundImage  = `radial-gradient(circle, rgba(255,255,255,0.2) 20%, transparent 60%)`;
 
-                if (block) {
+                if (block && hasItem) {
+                    slot.style.backgroundColor = 'transparent';
+                    slot.style.backgroundImage = `url("./textures/${block.textureName}.png"), radial-gradient(circle, rgba(255,255,255,0.2) 20%, transparent 60%)`;
+                    slot.style.backgroundSize = "cover, cover";
                     slot.title = block.name;
-                    const qty  = game.inventory[blockId] || 0;
                     
                     slot.innerHTML = `
                         <span class="text-xs font-bold drop-shadow-[1px_1px_0px_#000] text-yellow-400 absolute top-0.5 left-1">${index + 1}</span>
                         <span class="text-[11px] font-bold drop-shadow-[1.5px_1.5px_0px_#000] text-white absolute bottom-0.5 right-1">x${qty}</span>
                     `;
+                } else {
+                    slot.style.backgroundColor = 'rgba(0,0,0,0.5)';
+                    slot.style.backgroundImage = 'none';
+                    slot.innerHTML = `<span class="text-xs font-bold text-neutral-600 absolute top-0.5 left-1">${index + 1}</span>`;
                 }
 
                 slot.addEventListener('click', () => {
-                    selectHotbarSlot(index);
+                    if (hasItem) selectHotbarSlot(index);
                 });
 
                 hotbarEl.appendChild(slot);
             });
 
             const activeBlockId = hotbarAssigned[game.activeBlockIndex];
-            const activeBlock   = BLOCKS.find(b => b.id === activeBlockId);
-            blockLabel.innerText = activeBlock ? activeBlock.name : "Leerer Slot";
+            const currentQty    = game.inventory[activeBlockId] || 0;
+            // Variable umbenannt um "Cannot redeclare" Fehler zu vermeiden
+            const activeBlockRef = (currentQty > 0 || game_gamemodes[game.playerId] === 'creative') ? BLOCKS.find(b => b.id === activeBlockId) : null;
+            blockLabel.innerText = activeBlockRef ? activeBlockRef.name : "";
         }
 
         function selectHotbarSlot(index) {
+            const bId = hotbarAssigned[index];
+            const qty = game.inventory[bId] || 0;
+            const isCreative = game_gamemodes[game.playerId] === 'creative';
+            
+            if (qty === 0 && !isCreative) return;
+
             game.activeBlockIndex = index;
-            const activeBlockId   = hotbarAssigned[index];
-            const currentBlock    = BLOCKS.find(b => b.id === activeBlockId);
-            if (currentBlock) {
-                armMesh.material = getBlockMaterials(currentBlock)[2];
+            const selectedBlockRef = BLOCKS.find(b => b.id === bId);
+            if (selectedBlockRef) {
+                armMesh.material = getBlockMaterials(selectedBlockRef)[2];
             }
             drawHotbar();
         }
@@ -2547,6 +2684,26 @@
                         showNotification(`Spieler ${targetPlayer} nicht gefunden!`);
                     }
                 }
+            } else if (cmd === 'teleport' || cmd === 'tp') {
+                // Aktuelle Position als Basis (falls nur x, y oder z angegeben wird)
+                let tx = camera.position.x;
+                let ty = camera.position.y - EYE_LEVEL;
+                let tz = camera.position.z;
+
+                args.forEach(arg => {
+                    const key = arg[0].toLowerCase();
+                    const val = parseFloat(arg.substring(1));
+                    if (!isNaN(val)) {
+                        if (key === 'x') tx = val;
+                        else if (key === 'y') ty = val;
+                        else if (key === 'z') tz = val;
+                    }
+                });
+
+                camera.position.set(tx, ty + EYE_LEVEL, tz);
+                player.velocity.set(0, 0, 0); // Momentum stoppen
+                showNotification(`Teleportiert zu: X:${tx.toFixed(1)} Y:${ty.toFixed(1)} Z:${tz.toFixed(1)}`);
+                addChatMessage(`<span class="text-gray-400 italic">Teleportiert zu ${tx.toFixed(1)}, ${ty.toFixed(1)}, ${tz.toFixed(1)}</span>`, true);
             }
         }
 
@@ -2717,9 +2874,6 @@
                     }
                 });
             }
-
-            armGroup.position.copy(camera.position);
-            armGroup.rotation.copy(camera.rotation);
 
             renderer.render(scene, camera);
         }
