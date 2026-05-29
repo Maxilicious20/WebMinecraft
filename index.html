@@ -1,0 +1,2540 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Minecraft Web Sandbox - Infinite Dev v2.1</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Three.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- Firebase Legacy SDKs für Kompatibilität -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap');
+        
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            user-select: none;
+            font-family: 'VT323', monospace;
+            background-color: #0c0c0c;
+        }
+
+        .mc-font-pixel {
+            font-family: 'Press Start 2P', monospace;
+        }
+        
+        /* Minecraft UI Style */
+        .mc-border {
+            border: 4px solid #3c3c3c;
+            border-top-color: #8d8d8d;
+            border-left-color: #8d8d8d;
+            border-bottom-color: #1d1d1d;
+            border-right-color: #1d1d1d;
+            background-color: #4a4a4a;
+        }
+
+        .mc-button {
+            border: 4px solid #000;
+            border-top-color: #8f8f8f;
+            border-left-color: #8f8f8f;
+            border-bottom-color: #373737;
+            border-right-color: #373737;
+            background-color: #5c5c5c;
+            color: #e0e0e0;
+            text-shadow: 2px 2px 0px #000;
+            font-family: 'Press Start 2P', monospace;
+            font-size: 11px;
+            transition: all 0.05s;
+        }
+
+        .mc-button:hover:not(:disabled) {
+            background-color: #7a7a7a;
+            color: #fff;
+            border-top-color: #b0b0b0;
+            border-left-color: #b0b0b0;
+        }
+
+        .mc-button:active:not(:disabled) {
+            border-top-color: #373737;
+            border-left-color: #373737;
+            border-bottom-color: #8f8f8f;
+            border-right-color: #8f8f8f;
+            padding-top: 6px;
+            padding-bottom: 2px;
+        }
+
+        .mc-button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .mc-slot {
+            background-color: rgba(139, 139, 139, 0.4);
+            border: 4px solid #373737;
+            border-top-color: #1d1d1d;
+            border-left-color: #1d1d1d;
+            border-bottom-color: #8f8f8f;
+            border-right-color: #8f8f8f;
+            position: relative;
+        }
+
+        .mc-slot-active {
+            border: 4px solid #ffffff !important;
+            transform: scale(1.08);
+            z-index: 10;
+        }
+
+        .mc-input {
+            background-color: #1e1e1e;
+            border: 4px solid #555;
+            border-bottom-color: #ccc;
+            border-right-color: #ccc;
+            color: #fff;
+            font-family: 'VT323', monospace;
+            padding: 4px 8px;
+            font-size: 1.5rem;
+            outline: none;
+        }
+
+        .mc-input:focus {
+            border-color: #a3e635;
+        }
+
+        #crosshair {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 18px;
+            height: 18px;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+            mix-blend-mode: difference;
+            z-index: 5;
+        }
+
+        /* Dirt-Background fürs Hauptmenü */
+        .minecraft-dirt-bg {
+            background-image: linear-gradient(rgba(0,0,0,0.65), rgba(0,0,0,0.65)), url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><rect width="32" height="32" fill="%235c3e26"/><rect width="16" height="16" fill="%2347301c" x="0" y="0"/><rect width="16" height="16" fill="%2347301c" x="16" y="16"/><rect width="4" height="4" fill="%23302013" x="4" y="4"/><rect width="4" height="4" fill="%23302013" x="20" y="20"/></svg>');
+            background-size: 64px 64px;
+        }
+
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #2a2a2a;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #555;
+            border: 2px solid #2a2a2a;
+        }
+    </style>
+</head>
+<body class="text-white select-none">
+
+    <!-- Drei-Dimensionale Spielwelt (erst sichtbar wenn Spiel startet) -->
+    <div id="canvas-container" class="w-full h-full absolute inset-0 z-0 hidden"></div>
+
+    <!-- Roter Schadensindikator -->
+    <div id="damage-flash" class="absolute inset-0 bg-red-600/0 pointer-events-none transition-colors duration-100 ease-out z-30"></div>
+
+    <!-- Fadenkreuz -->
+    <div id="crosshair" class="hidden">
+        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 2V22M2 12H22" stroke="white" stroke-width="2.5" stroke-linecap="square"/>
+        </svg>
+    </div>
+
+    <!-- F3 Debug Overlay Screen -->
+    <div id="debug-screen" class="hidden absolute left-4 top-24 z-10 p-3 bg-black/75 rounded border border-white/20 text-base space-y-1 max-w-sm pointer-events-none select-text">
+        <div class="text-green-400 font-bold mc-font-pixel text-[10px]">F3 DEBUG-DATEN</div>
+        <div>FPS: <span id="debug-fps" class="text-white">60</span></div>
+        <div>Biom: <span id="debug-biome" class="text-yellow-400">-</span></div>
+        <div>Chunks aktiv: <span id="debug-chunks" class="text-white">0</span></div>
+        <div>Position: <span id="debug-pos" class="text-white">X: 0, Y: 0, Z: 0</span></div>
+        <div>Multiplayer Key: <span id="debug-key" class="text-cyan-400 font-bold">-</span></div>
+    </div>
+
+    <!-- HUD Overlay Container -->
+    <div id="hud-container" class="hidden absolute inset-x-0 bottom-4 flex flex-col items-center justify-end z-10 pointer-events-none">
+        <!-- Aktueller Blockname -->
+        <div class="mb-1 text-xl font-bold tracking-wider text-center drop-shadow-[0_2px_2px_rgba(0,0,0,1)] text-white" id="block-label">
+            Grasblock
+        </div>
+
+        <!-- Leben & Hunger-Leiste -->
+        <div class="flex justify-between w-[370px] px-1 mb-1.5 drop-shadow-[0_2px_0px_rgba(0,0,0,1)]">
+            <div id="hearts-container" class="flex gap-0.5"></div>
+            <div id="hunger-container" class="flex gap-0.5 flex-row-reverse"></div>
+        </div>
+
+        <!-- Hotbar mit genau 9 Slots -->
+        <div class="flex items-center gap-1 p-1 bg-black/55 rounded-sm border-4 border-[#3c3c3c] pointer-events-auto mc-border" id="hotbar">
+            <!-- Slots werden dynamisch geladen -->
+        </div>
+    </div>
+
+    <!-- Links-Oben Versionierung & Multiplayer-Session -->
+    <div id="topleft-hud" class="hidden absolute left-4 top-4 z-10 p-2 text-xl pointer-events-none drop-shadow-md text-slate-300 font-bold tracking-wide">
+        <div class="flex items-center gap-2">
+            <span>Minecraft Web</span>
+        </div>
+        <div class="text-sm text-gray-400 mt-1">Position: <span id="stat-pos" class="text-white font-bold">X: 0, Y: 0, Z: 0</span></div>
+        <div class="text-sm text-green-400 font-mono" id="session-tag">SESSION: offline</div>
+    </div>
+
+    <!-- Rechts-Oben System Panel -->
+    <div id="topright-hud" class="hidden absolute right-4 top-4 z-10 p-3 rounded bg-black/60 border-2 border-white/10 text-right text-lg pointer-events-none drop-shadow-lg">
+        <div class="text-cyan-400 font-bold mc-font-pixel text-[10px] tracking-wider">SPIEL-STATUS</div>
+        <div class="text-base mt-1 space-y-0.5">
+            <div>Spieler online: <span id="stat-players" class="font-bold text-white">1</span></div>
+            <div>Fliegen (C): <span id="stat-fly" class="font-bold text-red-400">AUS</span></div>
+            <div>Chunks: <span id="stat-chunks" class="font-bold text-white">0</span></div>
+            <div>Tageszeit: <span id="stat-time" class="font-bold text-yellow-400">Tag</span></div>
+        </div>
+    </div>
+
+    <!-- Chat Fenster -->
+    <div id="chat-container" class="hidden absolute left-4 bottom-4 z-10 w-80 h-44 bg-black/50 border border-white/10 rounded p-2 flex flex-col pointer-events-auto z-20">
+        <div class="text-[10px] text-cyan-400 font-bold mb-1 mc-font-pixel">CHATLOG</div>
+        <div id="chat-messages" class="flex-1 overflow-y-auto text-sm space-y-1 mb-1 font-sans">
+            <div class="text-gray-400">Willkommen im Multiplayer! Drücke T zum Sprechen.</div>
+        </div>
+        <input type="text" id="chat-input" placeholder="T zum Schreiben..." class="w-full bg-neutral-900 border border-neutral-700 text-sm px-1.5 py-0.5 outline-none rounded text-white" />
+    </div>
+
+    <!-- WELT-LADEBILDSCHIRM -->
+    <div id="generating-screen" class="hidden absolute inset-0 z-40 flex flex-col items-center justify-center bg-[#151515]">
+        <div class="z-10 flex flex-col items-center max-w-lg w-full px-6 text-center">
+            <h2 class="text-2xl text-white mb-8 tracking-widest uppercase font-bold mc-font-pixel" style="text-shadow: 4px 4px 0px #000;">
+                Generiere Welt...
+            </h2>
+            <div class="w-full max-w-md h-8 bg-neutral-800 border-4 border-[#3c3c3c] rounded-sm p-1">
+                <div id="loading-bar-fill" class="h-full bg-green-600 transition-all duration-100" style="width: 0%"></div>
+            </div>
+            <p id="loading-status" class="mt-4 text-xl tracking-wide text-neutral-400 font-semibold uppercase">
+                Lade Terrains...
+            </p>
+        </div>
+    </div>
+
+    <!-- MINECRAFT DEATH SCREEN -->
+    <div id="death-overlay" class="hidden absolute inset-0 z-50 flex flex-col items-center justify-center bg-red-950/85">
+        <h1 class="text-red-600 text-5xl md:text-6xl font-bold uppercase tracking-wider mb-8 mc-font-pixel text-center drop-shadow-[4px_4px_0px_#000]">
+            Du bist gestorben!
+        </h1>
+        <div class="flex flex-col gap-4 w-64">
+            <button id="btn-respawn" class="mc-button py-3 text-lg">Respawn</button>
+            <button id="btn-death-menu" class="mc-button py-3 text-lg">Hauptmenü</button>
+        </div>
+    </div>
+
+    <!-- MINECRAFT PAUSE SCREEN OVERLAY -->
+    <div id="pause-overlay" class="hidden absolute inset-0 z-20 flex flex-col items-center justify-center bg-black/60">
+        <h2 class="text-white text-3xl font-bold uppercase tracking-wider mb-10 mc-font-pixel text-center drop-shadow-[3px_3px_0px_#000]">
+            Spiel pausiert
+        </h2>
+        <div class="flex flex-col gap-4 w-72">
+            <button id="btn-resume" class="mc-button py-3 text-sm font-bold uppercase">Zurück zum Spiel</button>
+            <button id="btn-options-pause" class="mc-button py-3 text-sm font-bold uppercase">Optionen & Hilfe</button>
+            <button id="btn-quit" class="mc-button py-3 text-sm font-bold uppercase text-red-400">Hauptmenü verlassen</button>
+        </div>
+    </div>
+
+    <!-- INVENTORY SCREEN OVERLAY -->
+    <div id="inventory-overlay" class="hidden absolute inset-0 z-30 flex items-center justify-center bg-black/80">
+        <div class="w-[520px] max-w-full p-6 mc-border flex flex-col gap-4">
+            <div class="flex justify-between items-center border-b-4 border-[#1d1d1d] pb-2 mb-1">
+                <h3 class="text-2xl font-bold tracking-wider mc-font-pixel text-yellow-400 text-[10px]">INVENTAR & CRAFTING</h3>
+                <button id="btn-inventory-close" class="px-3 py-1 mc-button text-xs">X</button>
+            </div>
+            
+            <div class="flex gap-4">
+                <!-- Inventargrid -->
+                <div class="w-1/2">
+                    <span class="text-xs font-bold text-cyan-400 block mb-1">DEINE ITEMS</span>
+                    <div class="grid grid-cols-4 gap-2 p-2 bg-neutral-900 border-4 border-[#1c1c1c] rounded-sm max-h-48 overflow-y-auto" id="inventory-grid"></div>
+                </div>
+
+                <!-- Einfaches Crafting-System -->
+                <div class="w-1/2 p-2 bg-neutral-800 rounded border border-white/10 flex flex-col justify-between">
+                    <div>
+                        <span class="text-xs font-bold text-cyan-400 block mb-2">REZEPTE</span>
+                        <div class="space-y-1.5 text-sm" id="crafting-list">
+                            <!-- Dynamische Rezepte -->
+                        </div>
+                    </div>
+                    <div class="mt-2 text-xs text-gray-400">Klicke auf ein Rezept, um Gegenstände herzustellen!</div>
+                </div>
+            </div>
+
+            <div class="flex gap-2 justify-between items-center text-sm border-t border-white/10 pt-2">
+                <span>Ausgewählt: <span id="selected-qty-text" class="text-white font-bold">-</span></span>
+                <button id="btn-gain-blocks" class="mc-button px-3 py-1 font-bold uppercase text-[9px]">Stack auffüllen (+64)</button>
+            </div>
+
+            <!-- Schnellleiste zuweisen -->
+            <div class="p-2 bg-neutral-800 rounded border border-white/10">
+                <span class="text-xs font-bold block mb-1 text-cyan-400">SCHNELL-LEISTE BELEGEN:</span>
+                <div class="flex gap-1 justify-between" id="inventory-hotbar-assigner"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- HAUPTMENU OVERLAY -->
+    <div id="menu-overlay" class="absolute inset-0 z-20 flex flex-col items-center justify-center minecraft-dirt-bg p-4 overflow-y-auto">
+        <!-- Titel -->
+        <div class="text-center mb-8 px-4">
+            <h1 class="text-4xl md:text-6xl font-bold tracking-wider text-slate-100 drop-shadow-[0_6px_0px_rgba(50,50,50,1)] uppercase select-none mc-font-pixel" style="text-shadow: 4px 4px 0px #000;">
+                MINECRAFT
+            </h1>
+            <p class="text-yellow-400 text-lg md:text-2xl font-semibold mt-4 transform -rotate-2 hover:scale-105 transition-transform duration-100 select-none drop-shadow-[0_2px_0_rgba(0,0,0,1)] mc-font-pixel">
+                Web Sandbox v2.1
+            </p>
+        </div>
+
+        <!-- Menu Optionen -->
+        <div class="flex flex-col gap-3 w-96 max-w-full px-4 pointer-events-auto bg-black/60 p-6 rounded border border-white/10">
+            <!-- Spielerdaten Setup -->
+            <div class="flex flex-col gap-2">
+                <span class="text-xs font-bold text-slate-300 mc-font-pixel text-[9px]">1. SPIELER-NAME</span>
+                <input type="text" id="input-username" value="Steve" class="mc-input text-base text-center py-1 w-full" />
+            </div>
+
+            <!-- Welt Seed -->
+            <div class="flex flex-col gap-2 mt-2">
+                <span class="text-xs font-bold text-slate-300 mc-font-pixel text-[9px]">2. WELT-SEED</span>
+                <input type="text" id="input-world-seed" placeholder="Zufälliger Welt-Seed" value="BLOCKWORLD" class="mc-input text-base text-center py-1 w-full uppercase" />
+            </div>
+
+            <!-- Multiplayer & Share Keys -->
+            <div class="flex flex-col gap-2 mt-2 border-t border-white/10 pt-3">
+                <span class="text-xs font-bold text-green-400 mc-font-pixel text-[9px]">3. MULTIPLAYER-KEY (AUTOMATISCH)</span>
+                <input type="text" id="input-session-id" placeholder="Automatischer Key" class="mc-input text-sm text-center py-1 w-full uppercase" />
+                <p class="text-[11px] text-gray-400">Lass dieses Feld leer, um eine neue Session zu starten. Gib einen Key ein, um der Welt von Freunden beizutreten.</p>
+            </div>
+
+            <!-- Render Distanz -->
+            <div class="flex justify-between items-center mt-3 border-t border-white/10 pt-3">
+                <span class="text-sm">Sichtweite:</span>
+                <select id="select-render-distance" class="bg-neutral-900 border border-neutral-700 rounded text-sm p-1 outline-none text-white">
+                    <option value="2">2 Chunks (Sehr schnell)</option>
+                    <option value="3" selected>3 Chunks (Standard)</option>
+                    <option value="4">4 Chunks (Weit)</option>
+                </select>
+            </div>
+
+            <!-- Haupt-Buttons -->
+            <button id="btn-start" class="mc-button py-3 text-lg font-bold uppercase cursor-pointer mt-4 text-green-300">
+                Welt betreten
+            </button>
+
+            <button id="btn-music" class="mc-button py-1.5 text-xs font-bold uppercase cursor-pointer">
+                Musik: AUS
+            </button>
+        </div>
+
+        <div class="mt-8 text-center max-w-md px-6 text-gray-400 text-sm">
+            <p>Drücke <span class="text-white font-bold">W, A, S, D</span> zum Bewegen, <span class="text-white font-bold">Leertaste</span> zum Springen, <span class="text-white font-bold">E/I</span> fürs Inventar, <span class="text-white font-bold">C</span> zum Fliegen & <span class="text-white font-bold">F3</span> für Debug.</p>
+        </div>
+    </div>
+
+    <!-- Toast Benachrichtigung -->
+    <div id="custom-modal" class="hidden absolute top-10 left-1/2 -translate-x-1/2 z-50 p-4 bg-green-900 border-4 border-green-500 rounded text-center shadow-2xl flex flex-col items-center gap-2 max-w-md">
+        <p id="modal-text" class="text-lg font-bold text-white"></p>
+        <button id="btn-copy-modal" class="hidden px-4 py-1.5 mc-button text-xs font-bold uppercase tracking-wide">
+            Key in die Zwischenablage kopieren
+        </button>
+    </div>
+
+    <!-- Deterministisches Seed-Rauschen / LCG Generator Script -->
+    <script>
+        class SeededNoise {
+            constructor(seed) {
+                this.seed = this.hashSeed(seed);
+            }
+
+            hashSeed(str) {
+                let hash = 1789;
+                if (!str) return hash;
+                for (let i = 0; i < str.length; i++) {
+                    hash = ((hash << 5) - hash) + str.charCodeAt(i);
+                    hash |= 0;
+                }
+                return Math.abs(hash);
+            }
+
+            random2D(x, z) {
+                let val = Math.sin(x * 12.9898 + z * 78.233 + this.seed) * 43758.5453123;
+                return val - Math.floor(val);
+            }
+
+            noise(x, z) {
+                const xi = Math.floor(x);
+                const zi = Math.floor(z);
+                const xf = x - xi;
+                const zf = z - zi;
+
+                const u = xf * xf * (3.0 - 2.0 * xf);
+                const v = zf * zf * (3.0 - 2.0 * zf);
+
+                const r00 = this.random2D(xi, zi);
+                const r10 = this.random2D(xi + 1, zi);
+                const r01 = this.random2D(xi, zi + 1);
+                const r11 = this.random2D(xi + 1, zi + 1);
+
+                const top = r00 + u * (r10 - r00);
+                const bot = r01 + u * (r11 - r01);
+
+                return top + v * (bot - top);
+            }
+
+            fbm(x, z, octaves = 3) {
+                let total = 0;
+                let amplitude = 1;
+                let frequency = 1;
+                let maxValue = 0;
+
+                for (let i = 0; i < octaves; i++) {
+                    total += this.noise(x * frequency, z * frequency) * amplitude;
+                    maxValue += amplitude;
+                    amplitude *= 0.5;
+                    frequency *= 2;
+                }
+
+                return total / maxValue;
+            }
+        }
+    </script>
+
+    <!-- HILFSFUNKTION FÜR HOCHAUFLÖSENDE PIXEL-TEXTUREN (Detaillierter & schöner als einfache Farben) -->
+    <script>
+        function createMinecraftTexture(colorBase, type, blockName) {
+            const canvas = document.createElement('canvas');
+            canvas.width = 16;
+            canvas.height = 16;
+            const ctx = canvas.getContext('2d');
+            
+            ctx.fillStyle = colorBase;
+            ctx.fillRect(0, 0, 16, 16);
+
+            const hexToRgb = (hex) => {
+                const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+                return result ? {
+                    r: parseInt(result[1], 16),
+                    g: parseInt(result[2], 16),
+                    b: parseInt(result[3], 16)
+                } : { r: 128, g: 128, b: 128 };
+            };
+
+            const rgb = hexToRgb(colorBase);
+
+            // Prozedurales Rauschmuster für realistische Pixel-Blöcke
+            for (let x = 0; x < 16; x++) {
+                for (let y = 0; y < 16; y++) {
+                    let noise = (Math.random() - 0.5) * 35; 
+                    
+                    if (type === 'grass_top') {
+                        noise = (Math.random() - 0.4) * 45;
+                    } else if (type === 'stone') {
+                        noise = (Math.random() - 0.5) * 25;
+                    } else if (type === 'brick') {
+                        if (y % 4 === 0 || x % 4 === 0) noise = -50; 
+                    } else if (type === 'glass') {
+                        if (x === 0 || y === 0 || x === 15 || y === 15) {
+                            ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+                            ctx.fillRect(x, y, 1, 1);
+                            continue;
+                        } else if (x === y && x > 3 && x < 12) {
+                            ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+                            ctx.fillRect(x, y, 1, 1);
+                            continue;
+                        } else {
+                            ctx.clearRect(x, y, 1, 1);
+                            continue;
+                        }
+                    } else if (type === 'water') {
+                        noise = Math.sin(x * 0.5) * 15;
+                    }
+
+                    const nr = Math.max(0, Math.min(255, rgb.r + noise));
+                    const ng = Math.max(0, Math.min(255, rgb.g + noise));
+                    const nb = Math.max(0, Math.min(255, rgb.b + noise));
+                    
+                    ctx.fillStyle = `rgb(${Math.round(nr)}, ${Math.round(ng)}, ${Math.round(nb)})`;
+                    ctx.fillRect(x, y, 1, 1);
+                }
+            }
+
+            // Canvas in Three.js CanvasTexture umwandeln
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.magFilter = THREE.NearestFilter; // Pixelart-Filterung (wichtig für Minecraft-Gefühl!)
+            texture.minFilter = THREE.NearestFilter;
+            return texture;
+        }
+    </script>
+
+    <script>
+        // --- MULTIPLAYER & DATABASE SETUP ---
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'minecraft-sandbox-v2-0';
+        let firebaseConfig = null;
+        let db = null;
+        let auth = null;
+        let userLoaded = false;
+        let isMultiplayerActive = false;
+        let sessionListener = null;
+
+        if (typeof __firebase_config !== 'undefined' && __firebase_config) {
+            try {
+                firebaseConfig = JSON.parse(__firebase_config);
+                firebase.initializeApp(firebaseConfig);
+                db = firebase.firestore();
+                auth = firebase.auth();
+            } catch (err) {
+                console.warn("Firebase-Konfiguration konnte nicht geladen werden.", err);
+            }
+        }
+
+        async function initializeDatabaseAuth() {
+            if (!auth || !db) return;
+            try {
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await auth.signInWithCustomToken(__initial_auth_token);
+                } else {
+                    await auth.signInAnonymously();
+                }
+                userLoaded = true;
+                console.log("Firebase erfolgreich authentifiziert.");
+            } catch(e) {
+                console.error("Firebase Authentifizierung fehlgeschlagen", e);
+            }
+        }
+        initializeDatabaseAuth();
+
+        // --- OPTIMIERTE CHUNK CONFIG ---
+        const CHUNK_SIZE_XZ = 16;
+        const CHUNK_HEIGHT = 24; 
+        let RENDER_RADIUS = 3; 
+        const MAX_Y = CHUNK_HEIGHT - 1;
+
+        // --- GLOBALER SPIELSTATUS ---
+        const game = {
+            chunks: {},          
+            activeBlockIndex: 0, 
+            flyMode: false,
+            musicPlaying: false,
+            timeOfDay: 0.35,     
+            playerChunk: { x: null, z: null },
+            inventoryOpen: false,
+            selectedInventoryBlockId: 1, 
+            worldKey: "Default",
+            worldSeed: "BLOCKWORLD", 
+            noiseGen: null, 
+            modifiedBlocks: {}, 
+            isWorldLoaded: false,
+            // Survival-Parameter
+            playerHealth: 20, 
+            playerHunger: 20, 
+            lastCactusDamageTime: 0,
+            lastLavaDamageTime: 0,
+            // Inventarmengen
+            inventory: {
+                1: 64, // Grasblock
+                2: 64, // Erde
+                3: 16, // Stein
+                4: 16, // Pflasterstein
+                5: 16, // Eichenholzstamm
+                6: 32, // Laub
+                7: 32, // Holzbretter
+                8: 16, // Ziegelstein
+                9: 16, // Glasblock
+                10: 16, // Sand
+                11: 8,  // Kaktus
+                13: 8,  // TNT
+                14: 64, // Wasser
+                15: 64, // Lava
+                16: 0,  // Stöcke
+                17: 0   // Werkbank
+            },
+            // Multiplayer & Chat
+            username: "Steve",
+            sessionId: "OFFLINE",
+            playerId: "player_" + Math.random().toString(36).substring(2, 9),
+            players: {}, 
+            lastSendTime: 0,
+            chatInputActive: false,
+            // Debugging
+            debugActive: false,
+            fps: 60,
+            lastFpsUpdate: 0,
+            fpsFrames: 0,
+            currentBiomeName: "Plains",
+            tntExplosions: [],
+            activeMobs: [],
+            lastStepTime: 0,
+        };
+
+        const hotbarAssigned = [1, 2, 3, 4, 5, 6, 7, 8, 13];
+        let chunkRebuildQueue = [];
+        let isSwinging = false;
+        let swingTimer = 0;
+        let selectionBox = null;
+        let armGroup = null;
+        let armMesh = null;
+        let chunkUpdateTick = 0;
+
+        // --- SOUND ENGINE ---
+        const AudioEngine = {
+            ctx: null,
+            synthInterval: null,
+            init() {
+                if (!this.ctx) {
+                    this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+                }
+            },
+            playHit(blockId) {
+                this.init();
+                const now = this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                
+                if (blockId === 3 || blockId === 4) { 
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(140, now);
+                    osc.frequency.exponentialRampToValueAtTime(10, now + 0.15);
+                    gain.gain.setValueAtTime(0.3, now);
+                } else if (blockId === 10 || blockId === 11) { 
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(80, now);
+                    osc.frequency.exponentialRampToValueAtTime(5, now + 0.1);
+                    gain.gain.setValueAtTime(0.15, now);
+                } else { 
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(110, now);
+                    osc.frequency.exponentialRampToValueAtTime(15, now + 0.1);
+                    gain.gain.setValueAtTime(0.2, now);
+                }
+
+                gain.gain.linearRampToValueAtTime(0.01, now + 0.15);
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start(now);
+                osc.stop(now + 0.15);
+            },
+            playPlace() {
+                this.init();
+                const now = this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(240, now);
+                osc.frequency.exponentialRampToValueAtTime(110, now + 0.08);
+                gain.gain.setValueAtTime(0.12, now);
+                gain.gain.linearRampToValueAtTime(0.01, now + 0.08);
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start(now);
+                osc.stop(now + 0.08);
+            },
+            playJump() {
+                this.init();
+                const now = this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(140, now);
+                osc.frequency.exponentialRampToValueAtTime(240, now + 0.08);
+                gain.gain.setValueAtTime(0.08, now);
+                gain.gain.linearRampToValueAtTime(0.01, now + 0.08);
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start(now);
+                osc.stop(now + 0.08);
+            },
+            playOof() {
+                this.init();
+                const now = this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(110, now);
+                osc.frequency.linearRampToValueAtTime(75, now + 0.14);
+                gain.gain.setValueAtTime(0.35, now);
+                gain.gain.linearRampToValueAtTime(0.001, now + 0.14);
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start(now);
+                osc.stop(now + 0.14);
+            },
+            playExplosion() {
+                this.init();
+                const now = this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(90, now);
+                osc.frequency.exponentialRampToValueAtTime(10, now + 0.5);
+
+                gain.gain.setValueAtTime(0.4, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.65);
+
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start(now);
+                osc.stop(now + 0.7);
+            },
+            playFootstep(blockId) {
+                this.init();
+                const now = this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'triangle';
+
+                let pitch = 70;
+                let volume = 0.04;
+                let duration = 0.06;
+
+                switch (blockId) {
+                    case 1: 
+                        pitch = 65;
+                        volume = 0.05;
+                        break;
+                    case 3: 
+                    case 4: 
+                    case 8: 
+                        pitch = 115;
+                        volume = 0.03;
+                        duration = 0.05;
+                        break;
+                    case 10: 
+                        pitch = 50;
+                        volume = 0.07;
+                        duration = 0.08;
+                        break;
+                }
+
+                osc.frequency.setValueAtTime(pitch, now);
+                osc.frequency.exponentialRampToValueAtTime(10, now + duration);
+
+                gain.gain.setValueAtTime(volume, now);
+                gain.gain.linearRampToValueAtTime(0.001, now + duration);
+
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start(now);
+                osc.stop(now + duration);
+            },
+            toggleMusic(start) {
+                this.init();
+                if (!start) {
+                    if (this.synthInterval) {
+                        clearInterval(this.synthInterval);
+                        this.synthInterval = null;
+                    }
+                    return;
+                }
+                if (this.synthInterval) return;
+
+                const progressions = [
+                    [261.63, 329.63, 392.00, 493.88], 
+                    [349.23, 440.00, 523.25, 659.25], 
+                    [220.00, 261.63, 329.63, 392.00]
+                ];
+                let progressionIndex = 0;
+
+                const playAmbientNote = (freq, delay, duration, gainVal = 0.02) => {
+                    const now = this.ctx.currentTime + delay;
+                    const osc = this.ctx.createOscillator();
+                    const filter = this.ctx.createBiquadFilter();
+                    const gain = this.ctx.createGain();
+
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(freq, now);
+
+                    filter.type = 'lowpass';
+                    filter.frequency.setValueAtTime(550, now);
+
+                    gain.gain.setValueAtTime(0, now);
+                    gain.gain.linearRampToValueAtTime(gainVal, now + 1.2);
+                    gain.gain.exponentialRampToValueAtTime(0.0001, now + duration - 0.2);
+
+                    osc.connect(filter);
+                    filter.connect(gain);
+                    gain.connect(this.ctx.destination);
+
+                    osc.start(now);
+                    osc.stop(now + duration);
+                };
+
+                const triggerChordSequence = () => {
+                    if (!game.musicPlaying) return;
+                    const chord = progressions[progressionIndex];
+                    progressionIndex = (progressionIndex + 1) % progressions.length;
+
+                    chord.forEach((freq, idx) => {
+                        playAmbientNote(freq, idx * 0.15, 4.0, 0.02);
+                    });
+                };
+
+                triggerChordSequence();
+                this.synthInterval = setInterval(triggerChordSequence, 8000);
+            }
+        };
+
+        // --- OP & GAMEMODE SYSTEM ---
+        const game_operators = {}; // Speichert OP-Status der Spieler
+        const game_gamemodes = {}; // Speichert Gamemode der Spieler
+
+        // --- DEFINITION UND TEXTUREN DER BLÖCKE (PIXELART) ---
+        const cubeGeo = new THREE.BoxGeometry(1, 1, 1);
+        const textureCache = {}; // Cache für geladene Texturen
+
+        const BLOCKS = [
+            { id: 1, name: "Grasblock", textureName: "grasblock", color: '#4c8121', textures: ['#513a25', '#513a25', '#4c8121', '#513a25', '#513a25', '#513a25'], types: ['dirt', 'dirt', 'grass_top', 'dirt', 'dirt', 'dirt'] },
+            { id: 2, name: "Erde", textureName: "erde", color: '#513a25', textures: ['#513a25', '#513a25', '#513a25', '#513a25', '#513a25', '#513a25'], types: ['dirt', 'dirt', 'dirt', 'dirt', 'dirt', 'dirt'] },
+            { id: 3, name: "Stein", textureName: "stein", color: '#737373', textures: ['#737373', '#737373', '#737373', '#737373', '#737373', '#737373'], types: ['stone', 'stone', 'stone', 'stone', 'stone', 'stone'] },
+            { id: 4, name: "Pflasterstein", textureName: "pflasterstein", color: '#616161', textures: ['#616161', '#616161', '#616161', '#616161', '#616161', '#616161'], types: ['stone', 'stone', 'stone', 'stone', 'stone', 'stone'] },
+            { id: 5, name: "Eichenholz", textureName: "eichenholz", color: '#3a2717', textures: ['#3a2717', '#3a2717', '#5a452a', '#5a452a', '#3a2717', '#3a2717'], types: ['dirt', 'dirt', 'grass_top', 'grass_top', 'dirt', 'dirt'] },
+            { id: 6, name: "Laub", textureName: "laub", color: '#1d4d1f', textures: ['#1d4d1f', '#1d4d1f', '#1d4d1f', '#1d4d1f', '#1d4d1f', '#1d4d1f'], types: ['grass_top', 'grass_top', 'grass_top', 'grass_top', 'grass_top', 'grass_top'], transparent: true },
+            { id: 7, name: "Holzbretter", textureName: "holzbretter", color: '#9c794a', textures: ['#9c794a', '#9c794a', '#9c794a', '#9c794a', '#9c794a', '#9c794a'], types: ['dirt', 'dirt', 'dirt', 'dirt', 'dirt', 'dirt'] },
+            { id: 8, name: "Ziegelstein", textureName: "ziegelstein", color: '#943821', textures: ['#943821', '#943821', '#943821', '#943821', '#943821', '#943821'], types: ['brick', 'brick', 'brick', 'brick', 'brick', 'brick'] },
+            { id: 9, name: "Glasblock", textureName: "glasblock", color: '#d7f0ff', textures: ['#ffffff', '#ffffff', '#ffffff', '#ffffff', '#ffffff', '#ffffff'], types: ['glass', 'glass', 'glass', 'glass', 'glass', 'glass'], transparent: true },
+            { id: 10, name: "Sand", textureName: "sand", color: '#e5cca0', textures: ['#e5cca0', '#e5cca0', '#e5cca0', '#e5cca0', '#e5cca0', '#e5cca0'], types: ['dirt', 'dirt', 'dirt', 'dirt', 'dirt', 'dirt'] },
+            { id: 11, name: "Kaktus", textureName: "kaktus", color: '#1e6f2b', textures: ['#1e6f2b', '#1e6f2b', '#1e6f2b', '#1e6f2b', '#1e6f2b', '#1e6f2b'], types: ['stone', 'stone', 'stone', 'stone', 'stone', 'stone'] },
+            { id: 13, name: "TNT Block", textureName: "tnt", color: '#cc3333', textures: ['#cc3333', '#cc3333', '#dd3333', '#513a25', '#cc3333', '#cc3333'], types: ['dirt', 'dirt', 'stone', 'dirt', 'dirt', 'dirt'] },
+            { id: 14, name: "Wasser", textureName: "wasser", color: '#3355ff', textures: ['#3355ff', '#3355ff', '#3355ff', '#3355ff', '#3355ff', '#3355ff'], types: ['water', 'water', 'water', 'water', 'water', 'water'], transparent: true, fluid: true },
+            { id: 15, name: "Lava", textureName: "lava", color: '#ff3300', textures: ['#ff3300', '#ff3300', '#ff3300', '#ff3300', '#ff3300', '#ff3300'], types: ['dirt', 'dirt', 'dirt', 'dirt', 'dirt', 'dirt'], fluid: true },
+            { id: 16, name: "Stöcke", textureName: "stocke", color: '#7a5a3a', textures: ['#7a5a3a', '#7a5a3a', '#7a5a3a', '#7a5a3a', '#7a5a3a', '#7a5a3a'], types: ['dirt', 'dirt', 'dirt', 'dirt', 'dirt', 'dirt'] },
+            { id: 17, name: "Werkbank", textureName: "werkbank", color: '#7a5a3a', textures: ['#7a5a3a', '#7a5a3a', '#9c794a', '#9c794a', '#7a5a3a', '#7a5a3a'], types: ['stone', 'stone', 'dirt', 'dirt', 'stone', 'stone'] }
+        ];
+
+        // Cache für Materialien, damit Chunks extrem schnell generiert werden (Flüssiges Rendern!)
+        const materialCache = {};
+
+        function getBlockMaterials(blockDef) {
+            const cacheKey = blockDef.id;
+            if (materialCache[cacheKey]) return materialCache[cacheKey];
+
+            const mats = [];
+            for (let i = 0; i < 6; i++) {
+                const color = blockDef.textures[i];
+                const type = blockDef.types ? blockDef.types[i] : 'dirt';
+                let texture = null;
+                
+                // Versuche, Textur aus textures/ Ordner zu laden
+                if (blockDef.textureName && textureCache[blockDef.textureName]) {
+                    texture = textureCache[blockDef.textureName];
+                } else {
+                    texture = createMinecraftTexture(color, type, blockDef.textureName);
+                }
+                
+                mats.push(new THREE.MeshStandardMaterial({
+                    map: texture,
+                    transparent: !!blockDef.transparent,
+                    opacity: blockDef.transparent ? (blockDef.fluid ? 0.65 : 0.85) : 1,
+                    roughness: 0.9,
+                    metalness: 0.1
+                }));
+            }
+            materialCache[cacheKey] = mats;
+            return mats;
+        }
+        
+        // Lade Texturen aus dem textures/ Ordner
+        async function loadTexturesFromFolder() {
+            const textureNames = [
+                'grasblock', 'erde', 'stein', 'pflasterstein', 'eichenholz', 'laub',
+                'holzbretter', 'ziegelstein', 'glasblock', 'sand', 'kaktus', 'tnt',
+                'wasser', 'lava', 'stocke', 'werkbank'
+            ];
+            
+            for (const name of textureNames) {
+                try {
+                    const imagePath = `textures/${name}.png`;
+                    const img = new Image();
+                    img.onload = () => {
+                        const textureLoader = new THREE.TextureLoader();
+                        const texture = new THREE.Texture(img);
+                        texture.magFilter = THREE.NearestFilter;
+                        texture.minFilter = THREE.NearestFilter;
+                        textureCache[name] = texture;
+                    };
+                    img.src = imagePath;
+                } catch(e) {
+                    // Fallback auf Standard-Texturen wenn Datei nicht existiert
+                }
+            }
+        }
+
+        // --- GRAFIK SETUP ---
+        const container = document.getElementById('canvas-container');
+        const scene = new THREE.Scene();
+        scene.fog = new THREE.FogExp2(0xaaccff, 0.025);
+
+        // Auswahlbox für Zielblock
+        selectionBox = new THREE.Mesh(
+            new THREE.BoxGeometry(1.01, 1.01, 1.01),
+            new THREE.MeshBasicMaterial({ color: 0xffffff, wireframe: true, transparent: true, opacity: 0.65 })
+        );
+        selectionBox.visible = false;
+        scene.add(selectionBox);
+
+        const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: false, alpha: false, powerPreference: "high-performance" });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(1); // Festgelegt auf 1 für extreme Leistungssteigerung ohne Ruckeln
+        container.appendChild(renderer.domElement);
+
+        // Minecraft typischer Spielerarm rechts unten
+        armGroup = new THREE.Group();
+        armMesh = new THREE.Mesh(
+            new THREE.BoxGeometry(0.2, 0.2, 0.7),
+            new THREE.MeshStandardMaterial({ color: 0xc69c6d, roughness: 0.95, metalness: 0.05 })
+        );
+        armMesh.position.set(0.28, -0.3, -0.5);
+        armGroup.add(armMesh);
+        scene.add(armGroup);
+
+        // --- LICHTER ---
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.55);
+        scene.add(ambientLight);
+
+        const dirLight = new THREE.DirectionalLight(0xffffff, 0.85);
+        dirLight.position.set(15, 45, 10);
+        scene.add(dirLight);
+
+        // --- VERBESSERTE BIOMLISTE (OHNE SCHNEE) ---
+        class BiomeGenerator {
+            constructor(seed) {
+                this.noiseGen = new SeededNoise(seed);
+            }
+
+            getBiome(x, z) {
+                const heat = this.noiseGen.fbm(x * 0.005, z * 0.005, 2);
+                const moisture = this.noiseGen.fbm(x * 0.006 + 250, z * 0.006 + 250, 2);
+
+                if (heat > 0.62 && moisture < 0.35) {
+                    return { name: "Desert", heightOffset: 2, scale: 2, topBlock: 10, subBlock: 10 };
+                } else if (heat > 0.45 && moisture > 0.55) {
+                    return { name: "Swamp", heightOffset: 1, scale: 1.5, topBlock: 1, subBlock: 2 };
+                } else if (heat > 0.4 && heat < 0.6 && moisture > 0.6) {
+                    return { name: "Forest", heightOffset: 4, scale: 5, topBlock: 1, subBlock: 2 };
+                } else if (heat < 0.45 && moisture < 0.4) {
+                    return { name: "Mountain", heightOffset: 6, scale: 11, topBlock: 3, subBlock: 3 };
+                } else {
+                    // Standardmäßig immer sommerliche Plains (Ebenen)
+                    return { name: "Plains", heightOffset: 3, scale: 3, topBlock: 1, subBlock: 2 };
+                }
+            }
+
+            getHeight(gx, gz) {
+                const b = this.getBiome(gx, gz);
+                const baseVal = this.noiseGen.fbm(gx * 0.012, gz * 0.012, 3);
+                return Math.floor(baseVal * b.scale + b.heightOffset);
+            }
+        }
+
+        // --- OPTIMIERTE CHUNK ENGINE ---
+        class Chunk {
+            constructor(cx, cz) {
+                this.cx = cx;
+                this.cz = cz;
+                this.blocks = new Uint8Array(CHUNK_SIZE_XZ * CHUNK_SIZE_XZ * CHUNK_HEIGHT);
+                this.instancedMeshes = {}; 
+                this.group = new THREE.Group();
+                this.group.position.set(cx * CHUNK_SIZE_XZ, 0, cz * CHUNK_SIZE_XZ);
+                this.group.matrixAutoUpdate = false;
+                this.group.updateMatrix();
+                this.generateTerrain();
+            }
+
+            getIndex(x, y, z) {
+                return (x * CHUNK_SIZE_XZ * CHUNK_HEIGHT) + (z * CHUNK_HEIGHT) + y;
+            }
+
+            generateTerrain() {
+                const worldXOffset = this.cx * CHUNK_SIZE_XZ;
+                const worldZOffset = this.cz * CHUNK_SIZE_XZ;
+
+                for (let x = 0; x < CHUNK_SIZE_XZ; x++) {
+                    for (let z = 0; z < CHUNK_SIZE_XZ; z++) {
+                        const gx = worldXOffset + x;
+                        const gz = worldZOffset + z;
+
+                        const b = game.noiseGen.getBiome(gx, gz);
+                        const finalHeight = Math.max(1, Math.min(MAX_Y, game.noiseGen.getHeight(gx, gz)));
+
+                        for (let y = 0; y <= finalHeight; y++) {
+                            let blockId = 3; 
+
+                            if (y === finalHeight) {
+                                blockId = b.topBlock;
+                            } else if (y > finalHeight - 3) {
+                                blockId = b.subBlock;
+                            }
+
+                            const coordinateKey = `${gx},${y},${gz}`;
+                            if (game.modifiedBlocks[coordinateKey] !== undefined) {
+                                blockId = game.modifiedBlocks[coordinateKey];
+                            }
+
+                            if (blockId > 0) {
+                                this.blocks[this.getIndex(x, y, z)] = blockId;
+                            }
+                        }
+
+                        // Deterministischer Vegetations-Spawn (Kein Zufall während des Laufens)
+                        if (x === 8 && z === 8) {
+                            const hash = game.noiseGen.noiseGen.random2D(gx, gz);
+                            if (b.name === "Forest" && hash > 0.4) {
+                                this.buildTree(x, finalHeight, z, 5, 6); 
+                            } else if (b.name === "Desert" && hash > 0.72) {
+                                this.buildCactus(x, finalHeight, z);
+                            }
+                        }
+                    }
+                }
+
+                // Modifikationen nachträglich injizieren
+                Object.keys(game.modifiedBlocks).forEach(key => {
+                    const [gx, gy, gz] = key.split(',').map(Number);
+                    const cx = Math.floor(gx / CHUNK_SIZE_XZ);
+                    const cz = Math.floor(gz / CHUNK_SIZE_XZ);
+                    if (cx === this.cx && cz === this.cz) {
+                        const rx = ((gx % CHUNK_SIZE_XZ) + CHUNK_SIZE_XZ) % CHUNK_SIZE_XZ;
+                        const rz = ((gz % CHUNK_SIZE_XZ) + CHUNK_SIZE_XZ) % CHUNK_SIZE_XZ;
+                        if (gy >= 0 && gy < CHUNK_HEIGHT) {
+                            this.blocks[this.getIndex(rx, gy, rz)] = game.modifiedBlocks[key];
+                        }
+                    }
+                });
+            }
+
+            buildTree(tx, ty, tz, logId, leafId) {
+                const trunkH = 4;
+                for (let th = 1; th <= trunkH; th++) {
+                    const yPos = ty + th;
+                    if (yPos < CHUNK_HEIGHT) {
+                        this.blocks[this.getIndex(tx, yPos, tz)] = logId;
+                    }
+                }
+                const leafCenterY = ty + trunkH;
+                for (let lx = -1; lx <= 1; lx++) {
+                    for (let lz = -1; lz <= 1; lz++) {
+                        for (let ly = 0; ly <= 2; ly++) {
+                            const px = tx + lx;
+                            const py = leafCenterY + ly;
+                            const pz = tz + lz;
+                            if (px >= 0 && px < CHUNK_SIZE_XZ && pz >= 0 && pz < CHUNK_SIZE_XZ && py >= 0 && py < CHUNK_HEIGHT) {
+                                const idx = this.getIndex(px, py, pz);
+                                if (this.blocks[idx] === 0) {
+                                    this.blocks[idx] = leafId;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            buildCactus(tx, ty, tz) {
+                const h = 3;
+                for (let ch = 1; ch <= h; ch++) {
+                    const yPos = ty + ch;
+                    if (yPos < CHUNK_HEIGHT) {
+                        this.blocks[this.getIndex(tx, yPos, tz)] = 11;
+                    }
+                }
+            }
+
+            // Schnelle Sichtbarkeitsprüfung, um verdeckte Flächen gar nicht erst zu rendern (Enorme Performance-Steigerung!)
+            isBlockVisible(x, y, z) {
+                if (x === 0 || x === CHUNK_SIZE_XZ - 1 || z === 0 || z === CHUNK_SIZE_XZ - 1 || y === 0 || y === MAX_Y) {
+                    return true;
+                }
+                const left = this.blocks[this.getIndex(x - 1, y, z)];
+                const right = this.blocks[this.getIndex(x + 1, y, z)];
+                const down = this.blocks[this.getIndex(x, y - 1, z)];
+                const up = this.blocks[this.getIndex(x, y + 1, z)];
+                const back = this.blocks[this.getIndex(x, y, z - 1)];
+                const front = this.blocks[this.getIndex(x, y, z + 1)];
+
+                return left === 0 || right === 0 || down === 0 || up === 0 || back === 0 || front === 0;
+            }
+
+            rebuildMesh() {
+                Object.values(this.instancedMeshes).forEach(mesh => this.group.remove(mesh));
+                this.instancedMeshes = {};
+
+                const blockList = {};
+                for (let x = 0; x < CHUNK_SIZE_XZ; x++) {
+                    for (let z = 0; z < CHUNK_SIZE_XZ; z++) {
+                        for (let y = 0; y < CHUNK_HEIGHT; y++) {
+                            const blockId = this.blocks[this.getIndex(x, y, z)];
+                            if (blockId > 0 && this.isBlockVisible(x, y, z)) {
+                                if (!blockList[blockId]) blockList[blockId] = [];
+                                blockList[blockId].push({ x, y, z });
+                            }
+                        }
+                    }
+                }
+
+                Object.keys(blockList).forEach(bId => {
+                    const blockId = parseInt(bId);
+                    const positions = blockList[blockId];
+                    const blockDef = BLOCKS.find(b => b.id === blockId);
+                    if (!blockDef) return;
+
+                    const mats = getBlockMaterials(blockDef);
+                    const instMesh = new THREE.InstancedMesh(cubeGeo, mats, positions.length);
+                    const dummy = new THREE.Object3D();
+
+                    positions.forEach((pos, i) => {
+                        dummy.position.set(pos.x, pos.y, pos.z);
+                        dummy.updateMatrix();
+                        instMesh.setMatrixAt(i, dummy.matrix);
+                    });
+
+                    instMesh.instanceMatrix.needsUpdate = true;
+                    this.group.add(instMesh);
+                    this.instancedMeshes[blockId] = instMesh;
+                });
+            }
+        }
+
+        // --- REALTIME MULTIPLAYER SYNC ---
+        class MultiplayerSession {
+            constructor(sessionId) {
+                this.sessionId = sessionId;
+                this.playerRef = null;
+                this.worldChangesRef = null;
+                this.init();
+            }
+
+            async init() {
+                if (!db) return;
+                
+                // Rule 1: Pfadkonformität (/artifacts/{appId}/public/data/{collectionName})
+                this.playerRef = db.collection('artifacts').doc(appId)
+                                   .collection('public').doc('data')
+                                   .collection('players');
+
+                this.worldChangesRef = db.collection('artifacts').doc(appId)
+                                         .collection('public').doc('data')
+                                         .collection('worldChanges');
+
+                // Listener für andere Spieler (Ohne systemseitigen query-Filter zur Vermeidung von Index-Fehlern)
+                this.playerRef.onSnapshot(snap => {
+                    snap.docChanges().forEach(change => {
+                        const pid = change.doc.id;
+                        if (pid === game.playerId) return;
+
+                        if (change.type === 'added' || change.type === 'modified') {
+                            const data = change.doc.data();
+                            if (data && data.sessionId === this.sessionId) {
+                                this.renderRemotePlayer(pid, data);
+                            } else {
+                                this.removeRemotePlayer(pid);
+                            }
+                        } else if (change.type === 'removed') {
+                            this.removeRemotePlayer(pid);
+                        }
+                    });
+                }, err => console.warn("Multiplayer-Listener Fehler:", err));
+
+                // Listener für Platzierungen (Ohne systemseitigen query-Filter zur Vermeidung von Index-Fehlern)
+                this.worldChangesRef.onSnapshot(snap => {
+                    snap.docChanges().forEach(change => {
+                        if (change.type === 'added' || change.type === 'modified') {
+                            const data = change.doc.data();
+                            if (data && data.sessionId === this.sessionId) {
+                                if (data.senderId === game.playerId) return;
+                                
+                                const [gx, gy, gz] = data.coords.split(',').map(Number);
+                                setGlobalBlock(gx, gy, gz, data.blockId, false);
+                            }
+                        }
+                    });
+                }, err => console.warn("WorldChanges-Listener Fehler:", err));
+            }
+
+            renderRemotePlayer(pid, data) {
+                if (!game.players[pid]) {
+                    const group = new THREE.Group();
+                    const headGeo = new THREE.BoxGeometry(0.4, 0.4, 0.4);
+                    const headMat = new THREE.MeshBasicMaterial({ color: 0x10b981 });
+                    const head = new THREE.Mesh(headGeo, headMat);
+                    head.position.y = 0.7;
+                    group.add(head);
+
+                    const bodyGeo = new THREE.BoxGeometry(0.5, 0.7, 0.3);
+                    const bodyMat = new THREE.MeshBasicMaterial({ color: 0x3b82f6 });
+                    const body = new THREE.Mesh(bodyGeo, bodyMat);
+                    group.add(body);
+
+                    scene.add(group);
+                    game.players[pid] = { group, username: data.username };
+
+                    addChatMessage(`<span class="text-yellow-400 font-bold">${data.username} hat das Spiel betreten.</span>`, true);
+                    updateStatPlayersCount();
+                }
+
+                const playerGhost = game.players[pid].group;
+                playerGhost.position.set(data.x, data.y, data.z);
+                playerGhost.rotation.y = data.yaw;
+            }
+
+            removeRemotePlayer(pid) {
+                if (game.players[pid]) {
+                    scene.remove(game.players[pid].group);
+                    addChatMessage(`<span class="text-yellow-400 font-bold">${game.players[pid].username} hat das Spiel verlassen.</span>`, true);
+                    delete game.players[pid];
+                    updateStatPlayersCount();
+                }
+            }
+
+            sendLocalPosition() {
+                if (!this.playerRef) return;
+                const now = Date.now();
+                if (now - game.lastSendTime < 100) return;
+                game.lastSendTime = now;
+
+                this.playerRef.doc(game.playerId).set({
+                    sessionId: this.sessionId,
+                    username: game.username,
+                    x: camera.position.x,
+                    y: camera.position.y - 1.6,
+                    z: camera.position.z,
+                    yaw: controls.yaw,
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                }).catch(e => console.warn("Upload Position Fehler:", e));
+            }
+
+            sendBlockChange(coords, blockId) {
+                if (!this.worldChangesRef) return;
+                const changeId = `${this.sessionId}_${coords}_${Date.now()}`;
+                this.worldChangesRef.doc(changeId).set({
+                    sessionId: this.sessionId,
+                    coords: coords,
+                    blockId: blockId,
+                    senderId: game.playerId,
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                }).catch(e => console.warn("Upload Block Fehler:", e));
+            }
+        }
+
+        window.addEventListener('beforeunload', () => {
+            if (game.mpSession && game.mpSession.playerRef) {
+                game.mpSession.playerRef.doc(game.playerId).delete().catch(() => {});
+            }
+        });
+
+        // --- GLOBAL VOXEL GETTERS/SETTERS ---
+        function getGlobalBlock(gx, gy, gz) {
+            if (gy < 0 || gy >= CHUNK_HEIGHT) return 0;
+            const cx = Math.floor(gx / CHUNK_SIZE_XZ);
+            const cz = Math.floor(gz / CHUNK_SIZE_XZ);
+            const chunkKey = `${cx},${cz}`;
+            const chunk = game.chunks[chunkKey];
+            if (!chunk) return 0;
+
+            const rx = ((gx % CHUNK_SIZE_XZ) + CHUNK_SIZE_XZ) % CHUNK_SIZE_XZ;
+            const rz = ((gz % CHUNK_SIZE_XZ) + CHUNK_SIZE_XZ) % CHUNK_SIZE_XZ;
+            return chunk.blocks[chunk.getIndex(rx, gy, rz)];
+        }
+
+        function setGlobalBlock(gx, gy, gz, blockId, syncOnline = true) {
+            if (gy < 0 || gy >= CHUNK_HEIGHT) return;
+            const cx = Math.floor(gx / CHUNK_SIZE_XZ);
+            const cz = Math.floor(gz / CHUNK_SIZE_XZ);
+            const chunkKey = `${cx},${cz}`;
+
+            const coordsKey = `${gx},${gy},${gz}`;
+            game.modifiedBlocks[coordsKey] = blockId;
+            
+            if (!game.chunks[chunkKey]) {
+                game.chunks[chunkKey] = new Chunk(cx, cz);
+                scene.add(game.chunks[chunkKey].group);
+            }
+
+            const chunk = game.chunks[chunkKey];
+            const rx = ((gx % CHUNK_SIZE_XZ) + CHUNK_SIZE_XZ) % CHUNK_SIZE_XZ;
+            const rz = ((gz % CHUNK_SIZE_XZ) + CHUNK_SIZE_XZ) % CHUNK_SIZE_XZ;
+
+            chunk.blocks[chunk.getIndex(rx, gy, rz)] = blockId;
+            chunk.rebuildMesh();
+
+            if (rx === 0) rebuildChunkMesh(cx - 1, cz);
+            if (rx === CHUNK_SIZE_XZ - 1) rebuildChunkMesh(cx + 1, cz);
+            if (rz === 0) rebuildChunkMesh(cx, cz - 1);
+            if (rz === CHUNK_SIZE_XZ - 1) rebuildChunkMesh(cx, cz + 1);
+
+            if (syncOnline && isMultiplayerActive && game.mpSession) {
+                game.mpSession.sendBlockChange(coordsKey, blockId);
+            }
+        }
+
+        function rebuildChunkMesh(cx, cz) {
+            const chunk = game.chunks[`${cx},${cz}`];
+            if (chunk) chunk.rebuildMesh();
+        }
+
+        function processChunkQueue() {
+            // Begrenzte Rekonstruktionsrate verhindert FPS-Einbrüche komplett!
+            for (let i = 0; i < 2 && chunkRebuildQueue.length > 0; i++) {
+                const chunk = chunkRebuildQueue.shift();
+                if (chunk) chunk.rebuildMesh();
+            }
+        }
+
+        // --- INFINITE CHUNKS LOGIK ---
+        function updateInfiniteChunks() {
+            const px = Math.floor(camera.position.x / CHUNK_SIZE_XZ);
+            const pz = Math.floor(camera.position.z / CHUNK_SIZE_XZ);
+
+            if (game.playerChunk.x === px && game.playerChunk.z === pz) return;
+
+            game.playerChunk.x = px;
+            game.playerChunk.z = pz;
+
+            const currentKeys = new Set();
+            for (let x = -RENDER_RADIUS; x <= RENDER_RADIUS; x++) {
+                for (let z = -RENDER_RADIUS; z <= RENDER_RADIUS; z++) {
+                    const cx = px + x;
+                    const cz = pz + z;
+                    const key = `${cx},${cz}`;
+                    currentKeys.add(key);
+
+                    if (!game.chunks[key]) {
+                        game.chunks[key] = new Chunk(cx, cz);
+                        chunkRebuildQueue.push(game.chunks[key]);
+                        scene.add(game.chunks[key].group);
+                    }
+                }
+            }
+
+            // Chunks außerhalb des Sichtfelds entsorgen, um RAM-Anstieg zu stoppen
+            Object.keys(game.chunks).forEach(key => {
+                if (!currentKeys.has(key)) {
+                    scene.remove(game.chunks[key].group);
+                    Object.values(game.chunks[key].instancedMeshes).forEach(mesh => {
+                        scene.remove(mesh);
+                    });
+                    delete game.chunks[key];
+                }
+            });
+
+            const statChunks = document.getElementById('stat-chunks');
+            if (statChunks) {
+                statChunks.innerText = Object.keys(game.chunks).length;
+            }
+        }
+
+        // --- FIRST PERSON PHYSICS ---
+        const controls = {
+            moveForward: false,
+            moveBackward: false,
+            moveLeft: false,
+            moveRight: false,
+            jump: false,
+            flyDown: false,
+            isLocked: false,
+            yaw: 0,
+            pitch: 0,
+        };
+
+        const keys = {};
+
+        const menuOverlay = document.getElementById('menu-overlay');
+        const pauseOverlay = document.getElementById('pause-overlay');
+        const startBtn = document.getElementById('btn-start');
+        const resumeBtn = document.getElementById('btn-resume');
+        const quitBtn = document.getElementById('btn-quit');
+        const optionsPauseBtn = document.getElementById('btn-options-pause');
+
+        // Automatischer Multiplayer-Key Generierung im Feld
+        window.addEventListener('DOMContentLoaded', () => {
+            const randomKey = 'MC-' + Math.random().toString(36).substring(2, 7).toUpperCase();
+            document.getElementById('input-session-id').placeholder = randomKey;
+        });
+
+        startBtn.addEventListener('click', async () => {
+            // Einstellungen setzen
+            game.username = document.getElementById('input-username').value.trim() || "Steve";
+            game.worldSeed = document.getElementById('input-world-seed').value.trim() || "BLOCKWORLD";
+            game.noiseGen = new BiomeGenerator(game.worldSeed);
+
+            RENDER_RADIUS = parseInt(document.getElementById('select-render-distance').value);
+
+            // Lade Texturen
+            loadTexturesFromFolder();
+            
+            // Multiplayer Setup
+            let sessId = document.getElementById('input-session-id').value.trim().toUpperCase();
+            if (!sessId) {
+                sessId = document.getElementById('input-session-id').placeholder;
+            }
+            game.sessionId = sessId;
+            isMultiplayerActive = true;
+            game_gamemodes[game.playerId] = 'survival';
+            
+            document.getElementById('session-tag').innerText = `SESSION: ${game.sessionId}`;
+            document.getElementById('debug-key').innerText = game.sessionId;
+
+            // Zeige Ladebildschirm
+            document.getElementById('generating-screen').classList.remove('hidden');
+
+            // Authentifizierung
+            if (!userLoaded) {
+                await initializeDatabaseAuth();
+            }
+
+            game.mpSession = new MultiplayerSession(game.sessionId);
+            listenToChat();
+
+            // Ladebalken Animation
+            let progress = 0;
+            const interval = setInterval(() => {
+                progress += 20;
+                document.getElementById('loading-bar-fill').style.width = `${progress}%`;
+                
+                if (progress >= 100) {
+                    clearInterval(interval);
+                    
+                    // Korrekte Spawn-Höhe berechnen, damit man NICHT in der Luft spawnt!
+                    const spawnX = 0;
+                    const spawnZ = 0;
+                    let spawnHeight = Math.max(8, game.noiseGen.getHeight(spawnX, spawnZ) + 2.5);
+                    
+                    // Stelle sicher, dass der Spawn-Punkt frei ist
+                    for (let y = spawnHeight; y < spawnHeight + 5; y++) {
+                        const checkBlock = getGlobalBlock(spawnX, y, spawnZ);
+                        if (checkBlock === 0) {
+                            spawnHeight = y;
+                            break;
+                        }
+                    }
+                    
+                    camera.position.set(spawnX, spawnHeight, spawnZ);
+                    player.velocity.set(0, 0, 0);
+
+                    // UI umschalten
+                    document.getElementById('generating-screen').classList.add('hidden');
+                    document.getElementById('canvas-container').classList.remove('hidden');
+                    document.getElementById('hud-container').classList.remove('hidden');
+                    document.getElementById('topleft-hud').classList.remove('hidden');
+                    document.getElementById('topright-hud').classList.remove('hidden');
+                    document.getElementById('chat-container').classList.remove('hidden');
+                    document.getElementById('crosshair').classList.remove('hidden');
+
+                    container.requestPointerLock();
+                    game.isWorldLoaded = true;
+                }
+            }, 150);
+        });
+
+        // Pause Menu resume und quit handling
+        resumeBtn.addEventListener('click', () => {
+            container.requestPointerLock();
+        });
+
+        optionsPauseBtn.addEventListener('click', () => {
+            showNotification("Nutze WASD zum Gehen, Leertaste zum Springen und C zum Fliegen!");
+        });
+
+        quitBtn.addEventListener('click', () => {
+            pauseOverlay.classList.add('hidden');
+            document.getElementById('canvas-container').classList.add('hidden');
+            document.getElementById('hud-container').classList.add('hidden');
+            document.getElementById('topleft-hud').classList.add('hidden');
+            document.getElementById('topright-hud').classList.add('hidden');
+            document.getElementById('chat-container').classList.add('hidden');
+            document.getElementById('crosshair').classList.add('hidden');
+            
+            menuOverlay.classList.remove('hidden');
+            game.isWorldLoaded = false;
+        });
+
+        document.addEventListener('pointerlockchange', () => {
+            if (document.pointerLockElement === container) {
+                controls.isLocked = true;
+                menuOverlay.classList.add('hidden');
+                pauseOverlay.classList.add('hidden');
+                closeInventory();
+            } else {
+                controls.isLocked = false;
+                if (!game.inventoryOpen && !game.chatInputActive && game.playerHealth > 0 && game.isWorldLoaded) {
+                    pauseOverlay.classList.remove('hidden');
+                }
+            }
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            if (!controls.isLocked) return;
+
+            const sens = 0.0022;
+            controls.yaw -= e.movementX * sens;
+            controls.pitch -= e.movementY * sens;
+
+            controls.pitch = Math.max(-Math.PI / 2 + 0.05, Math.min(Math.PI / 2 - 0.05, controls.pitch));
+
+            camera.rotation.set(controls.pitch, controls.yaw, 0, 'YXZ');
+        });
+
+        window.addEventListener('keydown', (e) => {
+            if (game.chatInputActive) {
+                if (e.code === 'Enter') {
+                    sendChatMessage();
+                } else if (e.code === 'Escape') {
+                    closeChat();
+                }
+                return;
+            }
+
+            keys[e.code] = true;
+
+            if (e.code === 'KeyF' || e.code === 'F3') {
+                e.preventDefault();
+                game.debugActive = !game.debugActive;
+                document.getElementById('debug-screen').classList.toggle('hidden', !game.debugActive);
+            }
+
+            if (e.code === 'KeyT') {
+                e.preventDefault();
+                openChat();
+            }
+
+            if (e.code.startsWith('Digit')) {
+                const digitNum = parseInt(e.code.replace('Digit', ''));
+                if (digitNum >= 1 && digitNum <= 9) {
+                    selectHotbarSlot(digitNum - 1);
+                }
+            }
+
+            if (e.code === 'KeyE' || e.code === 'KeyI') {
+                if (controls.isLocked) {
+                    document.exitPointerLock();
+                    openInventory();
+                } else if (game.inventoryOpen) {
+                    closeInventory();
+                    container.requestPointerLock();
+                }
+            }
+
+            if (e.code === 'KeyC') {
+                game.flyMode = !game.flyMode;
+                showNotification(`Flugmodus: ${game.flyMode ? "AKTIV" : "DEAKTIVIERT"}`);
+                updateStatDisplay();
+                AudioEngine.playJump();
+            }
+        });
+
+        window.addEventListener('keyup', (e) => {
+            if (game.chatInputActive) return;
+            keys[e.code] = false;
+        });
+
+        window.addEventListener('wheel', (e) => {
+            if (!controls.isLocked) return;
+            let targetSlot = game.activeBlockIndex + (e.deltaY > 0 ? 1 : -1);
+            if (targetSlot < 0) targetSlot = 8;
+            if (targetSlot > 8) targetSlot = 0;
+            selectHotbarSlot(targetSlot);
+        });
+
+        function updateMovementKeys() {
+            controls.moveForward = keys['KeyW'] || keys['ArrowUp'];
+            controls.moveBackward = keys['KeyS'] || keys['ArrowDown'];
+            controls.moveLeft = keys['KeyA'] || keys['ArrowLeft'];
+            controls.moveRight = keys['KeyD'] || keys['ArrowRight'];
+            controls.jump = keys['Space'];
+            controls.flyDown = keys['ShiftLeft'] || keys['ShiftRight'];
+        }
+
+        // --- VERBESSERTE PHYSIK-WERTE FÜR CRISPY MINECRAFT SPASS ---
+        const player = {
+            velocity: new THREE.Vector3(),
+            dimensions: { width: 0.5, height: 1.8, depth: 0.5 },
+            onGround: false,
+            speed: 0.11,         // Erhöht für besseren Gameflow
+            flySpeed: 0.22,      // Erhöht
+            jumpStrength: 0.21,  // Schnellerer Aufstieg beim Springen
+            gravity: 0.014,      // Schnellere, realistischere Gravitation
+        };
+
+        // --- KOLLISIONEN & PHYSIK ---
+        function checkCollision(pos) {
+            const hw = player.dimensions.width / 2;
+            const hh = player.dimensions.height;
+            const hd = player.dimensions.depth / 2;
+
+            const minX = pos.x - hw;
+            const maxX = pos.x + hw;
+            const minY = pos.y;
+            const maxY = pos.y + hh;
+            const minZ = pos.z - hd;
+            const maxZ = pos.z + hd;
+
+            // Prüfe Blöcke mit Puffer um genaue Positionen
+            for (let x = Math.floor(minX) - 1; x <= Math.ceil(maxX) + 1; x++) {
+                for (let y = Math.floor(minY) - 1; y <= Math.ceil(maxY) + 1; y++) {
+                    for (let z = Math.floor(minZ) - 1; z <= Math.ceil(maxZ) + 1; z++) {
+                        const blockId = getGlobalBlock(x, y, z);
+                        const blockDef = BLOCKS.find(b => b.id === blockId);
+                        
+                        if (blockId > 0 && (!blockDef || !blockDef.fluid)) {
+                            // Genauere Kollisionsprüfung mit Block-Box
+                            const blockBox = new THREE.Box3(
+                                new THREE.Vector3(x - 0.5, y - 0.5, z - 0.5),
+                                new THREE.Vector3(x + 0.5, y + 0.5, z + 0.5)
+                            );
+                            
+                            const playerBox = new THREE.Box3(
+                                new THREE.Vector3(minX, minY, minZ),
+                                new THREE.Vector3(maxX, maxY, maxZ)
+                            );
+                            
+                            if (playerBox.intersectsBox(blockBox)) {
+                                return true;
+                            }
+                        }
+                    }
+                }
+            }
+            return false;
+        }
+        
+        // Funktion zum Entfernen von Spieler aus Blöcken
+        function unstickPlayerFromBlocks() {
+            const pos = camera.position.clone();
+            let moved = false;
+            let attempts = 0;
+            const maxAttempts = 8;
+            
+            while (checkCollision(new THREE.Vector3(pos.x, pos.y - 1.6, pos.z)) && attempts < maxAttempts) {
+                pos.y += 0.1;
+                attempts++;
+                moved = true;
+            }
+            
+            if (moved && attempts < maxAttempts) {
+                camera.position.copy(pos);
+            }
+        }
+
+        function handlePlayerPhysics() {
+            if (game.playerHealth <= 0 && !game.flyMode) return; // Stoppe Physik bei Tod (außer im Creative Mode)
+
+            // Nur Tastatureingaben lesen, wenn der Pointer gesperrt ist (nicht im Pause-Menü)
+            if (controls.isLocked) {
+                updateMovementKeys();
+            } else {
+                controls.moveForward = false;
+                controls.moveBackward = false;
+                controls.moveLeft = false;
+                controls.moveRight = false;
+                controls.jump = false;
+                controls.flyDown = false;
+            }
+
+            const sinYaw = Math.sin(controls.yaw);
+            const cosYaw = Math.cos(controls.yaw);
+
+            const forward = new THREE.Vector3(-sinYaw, 0, -cosYaw).normalize();
+            const right = new THREE.Vector3(cosYaw, 0, -sinYaw).normalize();
+
+            const targetVelocity = new THREE.Vector3();
+            if (controls.moveForward) targetVelocity.add(forward);
+            if (controls.moveBackward) targetVelocity.sub(forward);
+            if (controls.moveRight) targetVelocity.add(right);
+            if (controls.moveLeft) targetVelocity.sub(right);
+
+            targetVelocity.normalize();
+
+            const px = Math.floor(camera.position.x);
+            const py = Math.floor(camera.position.y - 1.6);
+            const pz = Math.floor(camera.position.z);
+            const currentBlockId = getGlobalBlock(px, py, pz);
+            const isInsideWater = currentBlockId === 14;
+            const isInsideLava = currentBlockId === 15;
+
+            let activeSpeed = game.flyMode ? player.flySpeed : player.speed;
+            
+            if (isInsideWater) {
+                activeSpeed *= 0.45;
+            } else if (isInsideLava) {
+                activeSpeed *= 0.25;
+            }
+
+            targetVelocity.multiplyScalar(activeSpeed);
+
+            // Verbesserte Bewegungsphysik mit automatischem Unsticking
+            const nextPos = camera.position.clone();
+            nextPos.x += targetVelocity.x;
+            const checkX = new THREE.Vector3(nextPos.x, camera.position.y - 1.6, camera.position.z);
+            if (!checkCollision(checkX)) {
+                camera.position.x = nextPos.x;
+            }
+
+            nextPos.copy(camera.position);
+            nextPos.z += targetVelocity.z;
+            const checkZ = new THREE.Vector3(camera.position.x, camera.position.y - 1.6, nextPos.z);
+            if (!checkCollision(checkZ)) {
+                camera.position.z = nextPos.z;
+            }
+            
+            // Befreie Spieler aus Blöcken wenn nötig
+            if (checkCollision(new THREE.Vector3(camera.position.x, camera.position.y - 1.6, camera.position.z))) {
+                unstickPlayerFromBlocks();
+            }
+
+            // Lava-Schaden
+            if (isInsideLava) {
+                const now = Date.now();
+                if (now - game.lastLavaDamageTime > 500) {
+                    takeDamage(4); 
+                    game.lastLavaDamageTime = now;
+                }
+            }
+
+            // Kaktus-Schaden
+            const standingInCactus = currentBlockId === 11 || getGlobalBlock(px, py + 1, pz) === 11;
+            if (standingInCactus) {
+                const now = Date.now();
+                if (now - game.lastCactusDamageTime > 600) {
+                    takeDamage(2); 
+                    game.lastCactusDamageTime = now;
+                }
+            }
+
+            if (game.debugActive) {
+                const b = game.noiseGen.getBiome(px, pz);
+                document.getElementById('debug-biome').innerText = b.name;
+                document.getElementById('debug-pos').innerText = `X: ${px}, Y: ${py}, Z: ${pz}`;
+                document.getElementById('debug-fps').innerText = game.fps;
+                document.getElementById('debug-chunks').innerText = Object.keys(game.chunks).length;
+            }
+
+            if (game.flyMode) {
+                player.velocity.y = 0;
+                if (controls.jump) camera.position.y += player.flySpeed;
+                if (controls.flyDown) camera.position.y -= player.flySpeed;
+            } else {
+                let gravityPull = player.gravity;
+                if (isInsideWater || isInsideLava) {
+                    gravityPull *= 0.15; 
+                }
+
+                player.velocity.y -= gravityPull;
+                // Maximaler Fall-Speed angepasst an Minecraft
+                player.velocity.y = Math.max(isInsideWater ? -0.05 : -0.5, player.velocity.y);
+
+                nextPos.copy(camera.position);
+                nextPos.y += player.velocity.y;
+
+                const footHeightPosition = new THREE.Vector3(camera.position.x, nextPos.y - 1.6, camera.position.z);
+                
+                if (checkCollision(footHeightPosition)) {
+                    if (player.velocity.y < 0) {
+                        player.onGround = true;
+
+                        const fallVelocity = Math.abs(player.velocity.y);
+                        if (fallVelocity > 0.22 && !isInsideWater) {
+                            const calculatedFallDamage = Math.floor((fallVelocity - 0.21) * 110);
+                            if (calculatedFallDamage > 0) {
+                                takeDamage(calculatedFallDamage);
+                            }
+                        }
+
+                        player.velocity.y = 0;
+                    } else {
+                        player.velocity.y = -0.01;
+                    }
+                } else {
+                    player.onGround = false;
+                    camera.position.y = nextPos.y;
+                }
+
+                if (controls.jump && (player.onGround || isInsideWater || isInsideLava)) {
+                    player.velocity.y = isInsideWater ? 0.05 : player.jumpStrength;
+                    player.onGround = false;
+                    AudioEngine.playJump();
+                }
+
+                // Void Todesschwelle
+                if (camera.position.y < -15) {
+                    takeDamage(20); 
+                }
+            }
+
+            // Arm-Bewegung beim Gehen
+            const isMoving = controls.moveForward || controls.moveBackward || controls.moveLeft || controls.moveRight;
+            if (isMoving && !isSwinging) {
+                const swayY = Math.sin(Date.now() * 0.009) * 0.035;
+                const swayX = Math.cos(Date.now() * 0.004) * 0.018;
+                armMesh.position.y = -0.3 + swayY;
+                armMesh.position.x = 0.28 + swayX;
+            } else if (!isSwinging) {
+                armMesh.position.set(0.28, -0.3, -0.5);
+            }
+
+            if (isMultiplayerActive && game.mpSession) {
+                game.mpSession.sendLocalPosition();
+            }
+        }
+
+        // --- SCHLAG- & BLOCK-RAYCASTER ---
+        const raycaster = new THREE.Raycaster();
+        raycaster.far = 5.0;
+
+        function updateRaycast() {
+            if (game.playerHealth <= 0) return null;
+
+            const center = new THREE.Vector2(0, 0);
+            raycaster.setFromCamera(center, camera);
+
+            const meshesToQuery = [];
+            Object.values(game.chunks).forEach(chunk => {
+                Object.values(chunk.instancedMeshes).forEach(instMesh => {
+                    meshesToQuery.push(instMesh);
+                });
+            });
+
+            const intersects = raycaster.intersectObjects(meshesToQuery);
+
+            if (intersects.length > 0) {
+                const intersection = intersects[0];
+                const instMesh = intersection.object;
+                const instanceId = intersection.instanceId;
+
+                const matrix = new THREE.Matrix4();
+                instMesh.getMatrixAt(instanceId, matrix);
+                const pos = new THREE.Vector3();
+                pos.setFromMatrixPosition(matrix);
+
+                const finalPos = pos.clone().add(instMesh.parent.position);
+
+                selectionBox.position.copy(finalPos);
+                selectionBox.visible = true;
+
+                return {
+                    worldPos: finalPos,
+                    normal: intersection.face.normal,
+                    instanceId: instanceId,
+                    instMesh: instMesh
+                };
+            } else {
+                selectionBox.visible = false;
+                return null;
+            }
+        }
+
+        function triggerSwing() {
+            if (isSwinging) return;
+            isSwinging = true;
+            swingTimer = 0;
+        }
+
+        function animateSwing() {
+            if (!isSwinging) return;
+            swingTimer += 0.22; // Schnellerer Schwung
+            if (swingTimer >= Math.PI) {
+                isSwinging = false;
+                armMesh.rotation.set(0, 0, 0);
+                armMesh.position.set(0.28, -0.3, -0.5);
+                return;
+            }
+            armMesh.rotation.x = -Math.sin(swingTimer) * 0.9;
+            armMesh.position.z = -0.5 + Math.sin(swingTimer) * 0.25;
+        }
+
+        window.addEventListener('mousedown', (e) => {
+            if (!controls.isLocked || game.playerHealth <= 0) return;
+
+            const target = updateRaycast();
+
+            if (e.button === 0) { // Links-Klick: Abbauen
+                triggerSwing();
+                if (target) {
+                    const pos = target.worldPos;
+                    const targetedBlockId = getGlobalBlock(pos.x, pos.y, pos.z);
+
+                    if (targetedBlockId > 0 && targetedBlockId !== 13) {
+                        game.inventory[targetedBlockId] = (game.inventory[targetedBlockId] || 0) + 1;
+                        showNotification(`${BLOCKS.find(b => b.id === targetedBlockId).name} eingesammelt!`);
+                        drawHotbar();
+                    }
+
+                    if (targetedBlockId === 13) {
+                        // TNT Zünd-Animation
+                        const tntMesh = new THREE.Mesh(cubeGeo, new THREE.MeshBasicMaterial({ color: 0xffffff }));
+                        tntMesh.position.copy(pos);
+                        scene.add(tntMesh);
+                        setGlobalBlock(pos.x, pos.y, pos.z, 0);
+
+                        let toggle = false;
+                        const flashInterval = setInterval(() => {
+                            toggle = !toggle;
+                            tntMesh.material.color.setHex(toggle ? 0xcc3333 : 0xffffff);
+                        }, 180);
+
+                        setTimeout(() => {
+                            clearInterval(flashInterval);
+                            scene.remove(tntMesh);
+                            triggerTNTExplosion(pos);
+                        }, 2000);
+                    } else {
+                        setGlobalBlock(pos.x, pos.y, pos.z, 0);
+                        AudioEngine.playHit(targetedBlockId);
+                    }
+                }
+            } else if (e.button === 2) { // Rechts-Klick: Platzieren
+                triggerSwing();
+                if (target) {
+                    const norm = target.normal;
+                    const px = target.worldPos.x + norm.x;
+                    const py = target.worldPos.y + norm.y;
+                    const pz = target.worldPos.z + norm.z;
+
+                    const hw = player.dimensions.width / 2;
+                    const hh = player.dimensions.height;
+                    const hd = player.dimensions.depth / 2;
+                    
+                    const playerBox = new THREE.Box3(
+                        new THREE.Vector3(camera.position.x - hw, camera.position.y - 1.6, camera.position.z - hd),
+                        new THREE.Vector3(camera.position.x + hw, camera.position.y - 1.6 + hh, camera.position.z + hd)
+                    );
+                    const blockBox = new THREE.Box3(
+                        new THREE.Vector3(px - 0.5, py - 0.5, pz - 0.5),
+                        new THREE.Vector3(px + 0.5, py + 0.5, pz + 0.5)
+                    );
+
+                    if (!playerBox.intersectsBox(blockBox)) {
+                        const activeBlockId = hotbarAssigned[game.activeBlockIndex];
+                        const quantityAvailable = game.inventory[activeBlockId] || 0;
+
+                        if (quantityAvailable > 0 || game.flyMode) {
+                            if (!game.flyMode) {
+                                game.inventory[activeBlockId]--;
+                            }
+                            setGlobalBlock(px, py, pz, activeBlockId);
+                            AudioEngine.playPlace();
+                            drawHotbar();
+                        } else {
+                            showNotification(`Keine Blöcke in diesem Slot übrig!`);
+                        }
+                    }
+                }
+            }
+        });
+
+        window.addEventListener('contextmenu', e => e.preventDefault());
+
+        // --- SCHADENS- & LEBENS-HUD ---
+        function takeDamage(amount) {
+            if (game.flyMode || game.playerHealth <= 0) return; 
+
+            game.playerHealth = Math.max(0, game.playerHealth - amount);
+            generateStatHUDBars();
+            
+            const overlay = document.getElementById('damage-flash');
+            if (overlay) {
+                overlay.className = "absolute inset-0 bg-red-600/40 pointer-events-none z-30";
+                setTimeout(() => {
+                    overlay.className = "absolute inset-0 bg-red-600/0 pointer-events-none transition-colors duration-250 ease-out z-30";
+                }, 100);
+            }
+
+            AudioEngine.playOof();
+
+            if (game.playerHealth <= 0) {
+                handleDeath();
+            }
+        }
+
+        // --- MINECRAFT DEATH SCREEN PATTERN ---
+        const deathOverlay = document.getElementById('death-overlay');
+        const respawnBtn = document.getElementById('btn-respawn');
+        const deathMenuBtn = document.getElementById('btn-death-menu');
+
+        function handleDeath() {
+            document.exitPointerLock();
+            deathOverlay.classList.remove('hidden');
+        }
+
+        respawnBtn.addEventListener('click', () => {
+            deathOverlay.classList.add('hidden');
+            game.playerHealth = 20;
+            game.playerHunger = 20;
+            generateStatHUDBars();
+            
+            // Auf der Höhe des Spawn-Punkts respawnen
+            const spawnHeight = Math.max(8, game.noiseGen.getHeight(0, 0) + 2.5);
+            camera.position.set(0, spawnHeight, 0);
+            player.velocity.set(0, 0, 0);
+
+            container.requestPointerLock();
+        });
+
+        deathMenuBtn.addEventListener('click', () => {
+            deathOverlay.classList.add('hidden');
+            document.getElementById('canvas-container').classList.add('hidden');
+            document.getElementById('hud-container').classList.add('hidden');
+            document.getElementById('topleft-hud').classList.add('hidden');
+            document.getElementById('topright-hud').classList.add('hidden');
+            document.getElementById('chat-container').classList.add('hidden');
+            document.getElementById('crosshair').classList.add('hidden');
+            
+            menuOverlay.classList.remove('hidden');
+            game.isWorldLoaded = false;
+        });
+
+        function triggerTNTExplosion(pos) {
+            AudioEngine.playExplosion();
+            const radius = 3;
+            for (let dx = -radius; dx <= radius; dx++) {
+                for (let dy = -radius; dy <= radius; dy++) {
+                    for (let dz = -radius; dz <= radius; dz++) {
+                        const distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
+                        if (distance <= radius + 0.2) {
+                            setGlobalBlock(pos.x + dx, pos.y + dy, pos.z + dz, 0);
+                        }
+                    }
+                }
+            }
+            showNotification("TNT explodiert!");
+        }
+
+        // --- TAG & NACHTZYKLUS (SONNE, WOLKEN) ---
+        function updateDayNightCycle() {
+            game.timeOfDay += 0.00004; // Verdoppelte Tagesgeschwindigkeit
+            if (game.timeOfDay > 1) game.timeOfDay = 0;
+
+            const sineAngle = Math.sin(game.timeOfDay * Math.PI * 2);
+
+            let skyColor, intensity;
+            if (sineAngle > 0.15) {
+                skyColor = new THREE.Color(0xaaccff);
+                intensity = 0.95;
+                document.getElementById('stat-time').innerText = "Tag";
+                document.getElementById('stat-time').style.color = "#ffd700";
+            } else if (sineAngle > -0.15 && sineAngle <= 0.15) {
+                skyColor = new THREE.Color(0xcca18a);
+                intensity = 0.45;
+                document.getElementById('stat-time').innerText = "Sonnenuntergang";
+                document.getElementById('stat-time').style.color = "#ffa500";
+            } else {
+                skyColor = new THREE.Color(0x0a0f1d);
+                intensity = 0.15;
+                document.getElementById('stat-time').innerText = "Nacht";
+                document.getElementById('stat-time').style.color = "#60a5fa";
+            }
+
+            scene.background = skyColor;
+            scene.fog.color = skyColor;
+            renderer.setClearColor(skyColor);
+            dirLight.intensity = intensity;
+
+            dirLight.position.x = Math.sin(game.timeOfDay * Math.PI * 2) * 50;
+            dirLight.position.y = Math.cos(game.timeOfDay * Math.PI * 2) * 50;
+        }
+
+        // --- HUD LIFEBARS ---
+        const heartsContainer = document.getElementById('hearts-container');
+        const hungerContainer = document.getElementById('hunger-container');
+
+        function generateStatHUDBars() {
+            heartsContainer.innerHTML = '';
+            for (let i = 0; i < 10; i++) {
+                const heartVal = (i + 1) * 2;
+                let fillClass = "fill-red-600";
+                
+                if (game.playerHealth < heartVal - 1) {
+                    fillClass = "fill-neutral-900"; 
+                } else if (game.playerHealth === heartVal - 1) {
+                    fillClass = "fill-red-400"; 
+                }
+
+                heartsContainer.innerHTML += `
+                    <svg class="w-4 h-4 ${fillClass} drop-shadow-[1px_1px_0px_#000]" viewBox="0 0 24 24" stroke="black" stroke-width="1.5">
+                        <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+                    </svg>
+                `;
+            }
+
+            hungerContainer.innerHTML = '';
+            for (let i = 0; i < 10; i++) {
+                hungerContainer.innerHTML += `
+                    <svg class="w-4 h-4 fill-amber-700 drop-shadow-[1px_1px_0px_#000]" viewBox="0 0 24 24" stroke="black" stroke-width="1.5">
+                        <path d="M12 2c-3.5 0-6 2.5-6 6 0 1.5.5 3 1.5 4l-1.5 5.5c-.3.8.3 1.5 1 1.5h4c.8 0 1.5-.7 1.5-1.5V12.5C14 12 18 9 18 8c0-3.5-2.5-6-6-6z"/>
+                    </svg>
+                `;
+            }
+        }
+
+        const hotbarEl = document.getElementById('hotbar');
+        const blockLabel = document.getElementById('block-label');
+
+        function drawHotbar() {
+            hotbarEl.innerHTML = '';
+            hotbarAssigned.forEach((blockId, index) => {
+                const block = BLOCKS.find(b => b.id === blockId);
+                const slot = document.createElement('div');
+                
+                slot.className = `w-12 h-12 flex items-center justify-center cursor-pointer transition-all duration-75 relative mc-slot ${
+                    index === game.activeBlockIndex ? 'mc-slot-active' : ''
+                }`;
+                slot.style.backgroundColor = block ? block.color : 'rgba(0,0,0,0.5)';
+                slot.style.backgroundImage = `radial-gradient(circle, rgba(255,255,255,0.2) 20%, transparent 60%)`;
+
+                if (block) {
+                    slot.title = block.name;
+                    const qty = game.inventory[blockId] || 0;
+                    
+                    slot.innerHTML = `
+                        <span class="text-xs font-bold drop-shadow-[1px_1px_0px_#000] text-yellow-400 absolute top-0.5 left-1">${index + 1}</span>
+                        <span class="text-[11px] font-bold drop-shadow-[1.5px_1.5px_0px_#000] text-white absolute bottom-0.5 right-1">x${qty}</span>
+                    `;
+                }
+
+                slot.addEventListener('click', () => {
+                    selectHotbarSlot(index);
+                });
+
+                hotbarEl.appendChild(slot);
+            });
+
+            const activeBlockId = hotbarAssigned[game.activeBlockIndex];
+            const activeBlock = BLOCKS.find(b => b.id === activeBlockId);
+            blockLabel.innerText = activeBlock ? activeBlock.name : "Leerer Slot";
+        }
+
+        function selectHotbarSlot(index) {
+            game.activeBlockIndex = index;
+            const activeBlockId = hotbarAssigned[index];
+            const currentBlock = BLOCKS.find(b => b.id === activeBlockId);
+            if (currentBlock) {
+                armMesh.material = getBlockMaterials(currentBlock)[2]; 
+            }
+            drawHotbar();
+        }
+
+        // --- INVENTORY & CRAFTING SCREEN ---
+        const inventoryGrid = document.getElementById('inventory-grid');
+        const inventoryHotbarAssigner = document.getElementById('inventory-hotbar-assigner');
+        const selectedQtyText = document.getElementById('selected-qty-text');
+        const btnGainBlocks = document.getElementById('btn-gain-blocks');
+        const craftingList = document.getElementById('crafting-list');
+
+        const CRAFTING_RECIPES = [
+            { resultId: 16, count: 4, name: "Stöcke", ingredients: [{ id: 7, count: 2 }] },
+            { resultId: 17, count: 1, name: "Werkbank", ingredients: [{ id: 7, count: 4 }] }
+        ];
+
+        function buildInventoryUI() {
+            inventoryGrid.innerHTML = '';
+            BLOCKS.forEach(block => {
+                const item = document.createElement('div');
+                item.className = `w-12 h-12 flex items-center justify-center cursor-pointer border-4 border-neutral-700 hover:border-white transition-colors duration-100 relative ${
+                    block.id === game.selectedInventoryBlockId ? 'border-yellow-400 scale-105' : ''
+                }`;
+                item.style.backgroundColor = block.color;
+                item.style.backgroundImage = `radial-gradient(circle, rgba(255,255,255,0.2) 10%, transparent 50%)`;
+                item.title = block.name;
+
+                const qty = game.inventory[block.id] || 0;
+                item.innerHTML = `
+                    <span class="text-[10px] font-bold drop-shadow-[1.5px_1.5px_0px_#000] text-white absolute bottom-0.5 right-1">x${qty}</span>
+                `;
+
+                item.addEventListener('click', () => {
+                    game.selectedInventoryBlockId = block.id;
+                    buildInventoryUI();
+                });
+                inventoryGrid.appendChild(item);
+            });
+
+            const selectedBlock = BLOCKS.find(b => b.id === game.selectedInventoryBlockId);
+            selectedQtyText.innerText = selectedBlock ? `${selectedBlock.name} (x${game.inventory[selectedBlock.id] || 0})` : '-';
+
+            // Rezepte
+            craftingList.innerHTML = '';
+            CRAFTING_RECIPES.forEach(recipe => {
+                const row = document.createElement('div');
+                row.className = "flex justify-between items-center bg-neutral-900/60 p-1.5 rounded border border-neutral-700 hover:border-green-500 cursor-pointer transition-all";
+                
+                const ingNames = recipe.ingredients.map(ing => {
+                    const blockDef = BLOCKS.find(b => b.id === ing.id);
+                    return `${ing.count}x ${blockDef ? blockDef.name : "?"}`;
+                }).join(', ');
+
+                row.innerHTML = `
+                    <div>
+                        <div class="font-bold text-white text-xs">${recipe.name} (x${recipe.count})</div>
+                        <div class="text-[10px] text-gray-400">Bedarf: ${ingNames}</div>
+                    </div>
+                `;
+
+                row.addEventListener('click', () => {
+                    let hasIngredients = true;
+                    recipe.ingredients.forEach(ing => {
+                        if ((game.inventory[ing.id] || 0) < ing.count) {
+                            hasIngredients = false;
+                        }
+                    });
+
+                    if (hasIngredients) {
+                        recipe.ingredients.forEach(ing => {
+                            game.inventory[ing.id] -= ing.count;
+                        });
+                        game.inventory[recipe.resultId] = (game.inventory[recipe.resultId] || 0) + recipe.count;
+                        AudioEngine.playPlace();
+                        buildInventoryUI();
+                        drawHotbar();
+                    } else {
+                        showNotification("Nicht genügend Materialien!");
+                    }
+                });
+
+                craftingList.appendChild(row);
+            });
+
+            inventoryHotbarAssigner.innerHTML = '';
+            for (let i = 0; i < 9; i++) {
+                const currentAssignedId = hotbarAssigned[i];
+                const blockDef = BLOCKS.find(b => b.id === currentAssignedId);
+
+                const slotAssignBtn = document.createElement('button');
+                slotAssignBtn.className = "w-10 h-10 mc-button text-xs flex flex-col justify-center items-center font-bold";
+                slotAssignBtn.style.backgroundColor = blockDef ? blockDef.color : '#333';
+                slotAssignBtn.innerHTML = `<span class="text-[9px] text-white">S${i+1}</span>`;
+
+                slotAssignBtn.addEventListener('click', () => {
+                    hotbarAssigned[i] = game.selectedInventoryBlockId;
+                    AudioEngine.playPlace();
+                    buildInventoryUI();
+                    drawHotbar();
+                    selectHotbarSlot(game.activeBlockIndex);
+                });
+
+                inventoryHotbarAssigner.appendChild(slotAssignBtn);
+            }
+        }
+
+        btnGainBlocks.addEventListener('click', () => {
+            const bId = game.selectedInventoryBlockId;
+            if (bId) {
+                game.inventory[bId] = (game.inventory[bId] || 0) + 64;
+                AudioEngine.playPlace();
+                buildInventoryUI();
+                drawHotbar();
+            }
+        });
+
+        function openInventory() {
+            game.inventoryOpen = true;
+            document.getElementById('inventory-overlay').classList.remove('hidden');
+            buildInventoryUI();
+        }
+
+        function closeInventory() {
+            game.inventoryOpen = false;
+            document.getElementById('inventory-overlay').classList.add('hidden');
+        }
+
+        document.getElementById('btn-inventory-close').addEventListener('click', () => {
+            closeInventory();
+            container.requestPointerLock();
+        });
+
+        // --- REALTIME CHAT ENGINE ---
+        const chatMessages = document.getElementById('chat-messages');
+        const chatInput = document.getElementById('chat-input');
+
+        function openChat() {
+            game.chatInputActive = true;
+            chatInput.focus();
+            document.exitPointerLock();
+        }
+
+        function closeChat() {
+            game.chatInputActive = false;
+            chatInput.value = '';
+            chatInput.blur();
+            container.requestPointerLock();
+        }
+
+        function sendChatMessage() {
+            const msg = chatInput.value.trim();
+            if (msg) {
+                // Prüfe auf Commands
+                if (msg.startsWith('/')) {
+                    handleCommand(msg);
+                    closeChat();
+                    return;
+                }
+                
+                const displayMsg = `<span class="text-yellow-400 font-bold">${game.username}</span>: ${msg}`;
+                addChatMessage(displayMsg, false);
+
+                if (isMultiplayerActive && db) {
+                    db.collection('artifacts').doc(appId)
+                      .collection('public').doc('data')
+                      .collection('chat').add({
+                          sessionId: game.sessionId,
+                          username: game.username,
+                          message: msg,
+                          timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                      }).catch(e => console.warn("Chat Fehler:", e));
+                }
+            }
+            closeChat();
+        }
+        
+        function handleCommand(msg) {
+            const parts = msg.substring(1).split(' ');
+            const cmd = parts[0].toLowerCase();
+            const args = parts.slice(1);
+            
+            if (cmd === 'op') {
+                const targetPlayer = args.join(' ');
+                if (!targetPlayer) {
+                    showNotification("Benutzung: /op <Spielername>");
+                    return;
+                }
+                
+                let targetId = null;
+                for (const pid in game.players) {
+                    if (game.players[pid].username.toLowerCase() === targetPlayer.toLowerCase()) {
+                        targetId = pid;
+                        break;
+                    }
+                }
+                
+                if (targetId) {
+                    game_operators[targetId] = true;
+                    addChatMessage(`<span class="text-cyan-400 font-bold">System: ${targetPlayer} ist nun ein Operator.</span>`, true);
+                } else {
+                    showNotification(`Spieler ${targetPlayer} nicht gefunden!`);
+                }
+            } 
+            else if (cmd === 'gamemode') {
+                const mode = args[0]?.toLowerCase() || 'survival';
+                const targetPlayer = args.length > 1 ? args.slice(1).join(' ') : game.username;
+                
+                if (mode !== 'creative' && mode !== 'survival') {
+                    showNotification("Gültiger Modus: creative, survival");
+                    return;
+                }
+                
+                if (targetPlayer === 'me' || targetPlayer === game.username) {
+                    game_gamemodes[game.playerId] = mode;
+                    if (mode === 'creative') {
+                        game.flyMode = true;
+                        game.playerHealth = 20;
+                        showNotification(`Gamemode auf ${mode} umgestellt!`);
+                    } else {
+                        game.flyMode = false;
+                        showNotification(`Gamemode auf ${mode} umgestellt!`);
+                    }
+                    addChatMessage(`<span class="text-cyan-400 font-bold">System: ${game.username} Gamemode auf ${mode} umgestellt.</span>`, true);
+                } else {
+                    let targetId = null;
+                    for (const pid in game.players) {
+                        if (game.players[pid].username.toLowerCase() === targetPlayer.toLowerCase()) {
+                            targetId = pid;
+                            break;
+                        }
+                    }
+                    
+                    if (targetId) {
+                        game_gamemodes[targetId] = mode;
+                        addChatMessage(`<span class="text-cyan-400 font-bold">System: ${targetPlayer} Gamemode auf ${mode} umgestellt.</span>`, true);
+                    } else {
+                        showNotification(`Spieler ${targetPlayer} nicht gefunden!`);
+                    }
+                }
+            }
+        }
+
+        function addChatMessage(htmlContent, isSystemMessage = false) {
+            const div = document.createElement('div');
+            div.innerHTML = htmlContent;
+            if (!isSystemMessage) {
+                div.className = 'text-white';
+            }
+            chatMessages.appendChild(div);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        // Lokaler Tracker, um mehrfaches Rendern der im Speicher gefilterten Nachrichten zu verhindern
+        const renderedMessages = new Set();
+
+        function listenToChat() {
+            if (!isMultiplayerActive || !db) return;
+            
+            db.collection('artifacts').doc(appId)
+              .collection('public').doc('data')
+              .collection('chat')
+              .onSnapshot(snap => {
+                  const newMsgs = [];
+                  snap.forEach(doc => {
+                      const data = doc.data();
+                      // Überprüfe die Sessionzugehörigkeit lokal im Speicher, um den Firestore-Index-Zwang zu umgehen
+                      if (data && data.sessionId === game.sessionId && !renderedMessages.has(doc.id)) {
+                          newMsgs.push({ id: doc.id, ...data });
+                      }
+                  });
+
+                  // Sortiere die eintreffenden Nachrichten clientseitig nach Zeitstempel
+                  newMsgs.sort((a, b) => {
+                      const tA = a.timestamp ? (a.timestamp.seconds || a.timestamp) : 0;
+                      const tB = b.timestamp ? (b.timestamp.seconds || b.timestamp) : 0;
+                      return tA - tB;
+                  });
+
+                  newMsgs.forEach(msg => {
+                      renderedMessages.add(msg.id);
+                      if (msg.username !== game.username) {
+                          addChatMessage(`<span class="text-cyan-400 font-bold">${msg.username}</span>: ${msg.message}`);
+                      }
+                  });
+              }, err => console.warn("Chat-Listener Fehler:", err));
+        }
+
+        // --- TOAST NOTIFICATIONS ---
+        let currentGeneratedKeyText = "";
+
+        function showNotification(text, generatedKey = null) {
+            const modal = document.getElementById('custom-modal');
+            const modalText = document.getElementById('modal-text');
+            const copyBtn = document.getElementById('btn-copy-modal');
+
+            modalText.innerText = text;
+            modal.classList.remove('hidden');
+
+            if (generatedKey) {
+                currentGeneratedKeyText = generatedKey;
+                copyBtn.classList.remove('hidden');
+            } else {
+                copyBtn.classList.add('hidden');
+            }
+
+            const duration = generatedKey ? 10000 : 2500;
+
+            if (window.modalTimeout) {
+                clearTimeout(window.modalTimeout);
+            }
+
+            window.modalTimeout = setTimeout(() => {
+                modal.classList.add('hidden');
+                copyBtn.classList.add('hidden');
+            }, duration);
+        }
+
+        document.getElementById('btn-copy-modal').addEventListener('click', () => {
+            if (!currentGeneratedKeyText) return;
+            
+            const tempInput = document.createElement("input");
+            tempInput.value = currentGeneratedKeyText;
+            document.body.appendChild(tempInput);
+            tempInput.select();
+            
+            try {
+                document.execCommand('copy');
+                showNotification("Key kopiert!");
+            } catch (err) {
+                showNotification("Kopieren fehlgeschlagen.");
+            }
+            
+            document.body.removeChild(tempInput);
+        });
+
+        function updateStatPlayersCount() {
+            const count = Object.keys(game.players).length + 1;
+            document.getElementById('stat-players').innerText = count;
+        }
+
+        const btnMusic = document.getElementById('btn-music');
+        btnMusic.addEventListener('click', () => {
+            game.musicPlaying = !game.musicPlaying;
+            btnMusic.innerText = `Musik: ${game.musicPlaying ? "AN" : "AUS"}`;
+            AudioEngine.toggleMusic(game.musicPlaying);
+        });
+
+        function updateStatDisplay() {
+            document.getElementById('stat-fly').innerText = game.flyMode ? "AN" : "AUS";
+            document.getElementById('stat-fly').className = game.flyMode ? "font-bold text-green-400" : "font-bold text-red-400";
+        }
+
+        function updatePositionDisplay() {
+            const px = Math.floor(camera.position.x);
+            const py = Math.floor(camera.position.y - 1.6);
+            const pz = Math.floor(camera.position.z);
+            const statPos = document.getElementById('stat-pos');
+            if (statPos) {
+                statPos.innerText = `X: ${px}, Y: ${py}, Z: ${pz}`;
+            }
+        }
+
+        // --- ANIMATIONS SCHLEIFE ---
+        function animate() {
+            requestAnimationFrame(animate);
+
+            // Stoppe Rendering, wenn Welt noch nicht im Hauptmenü geladen/gestartet ist
+            if (!game.isWorldLoaded) return;
+
+            const now = performance.now();
+            game.fpsFrames++;
+            if (now > game.lastFpsUpdate + 1000) {
+                game.fps = Math.round((game.fpsFrames * 1000) / (now - game.lastFpsUpdate));
+                game.lastFpsUpdate = now;
+                game.fpsFrames = 0;
+            }
+
+            // Physik wird unabhängig vom Pointer Lock aufgerufen (damit Gravitation/Bewegungen bei geöffneter Pause weitergehen)
+            handlePlayerPhysics();
+
+            if (controls.isLocked) {
+                animateSwing();
+                updateRaycast();
+                updatePositionDisplay();
+            }
+
+            // Gethrotteltes Chunk-Update (erheblich verbesserte Performance, nur noch alle 5 Frames berechnen!)
+            chunkUpdateTick++;
+            if (chunkUpdateTick % 5 === 0) {
+                updateInfiniteChunks();
+            }
+
+            processChunkQueue();
+            updateDayNightCycle();
+
+            armGroup.position.copy(camera.position);
+            armGroup.rotation.copy(camera.rotation);
+
+            renderer.render(scene, camera);
+        }
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        window.onload = function() {
+            generateStatHUDBars();
+            selectHotbarSlot(0);
+            animate();
+        };
+
+    </script>
+</body>
+</html>
