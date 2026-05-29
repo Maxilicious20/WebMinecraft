@@ -322,14 +322,19 @@
 
             <!-- Multiplayer & Share Keys -->
             <div class="flex flex-col gap-2 mt-2 border-t border-white/10 pt-3">
-                <span class="text-xs font-bold text-green-400 mc-font-pixel text-[9px]">3. MULTIPLAYER-KEY (AUTOMATISCH)</span>
-                <input type="text" id="input-session-id" placeholder="Automatischer Key" class="mc-input text-sm text-center py-1 w-full uppercase" />
-                <p class="text-[11px] text-gray-400">Lass dieses Feld leer, um eine neue Session zu starten. Gib einen Key ein, um der Welt von Freunden beizutreten.</p>
+                <span class="text-xs font-bold text-green-400 mc-font-pixel text-[9px]">3. MULTIPLAYER - AKTIVE WELTEN</span>
+                <div id="lobby-list" class="bg-black/40 border-4 border-[#1c1c1c] rounded p-2 min-h-[100px] max-h-[150px] overflow-y-auto space-y-1 mb-2">
+                    <div class="text-xs text-gray-500 italic text-center py-4">Suche nach Welten...</div>
+                </div>
+                <div class="flex gap-2">
+                    <input type="text" id="input-session-id" placeholder="Weltname / Key" class="mc-input text-sm flex-1 uppercase" />
+                    <button id="btn-refresh-lobby" class="mc-button px-3 py-1">⟳</button>
+                </div>
             </div>
 
             <!-- Render Distanz -->
             <div class="flex justify-between items-center mt-3 border-t border-white/10 pt-3">
-                <span class="text-sm">Sichtweite:</span>
+                <span class="text-sm">Sichtweite (Chunks):</span>
                 <select id="select-render-distance" class="bg-neutral-900 border border-neutral-700 rounded text-sm p-1 outline-none text-white">
                     <option value="2">2 Chunks (Sehr schnell)</option>
                     <option value="3" selected>3 Chunks (Standard)</option>
@@ -1289,34 +1294,87 @@
 
         // --- REALTIME MULTIPLAYER SYNC ---
         class MultiplayerSession {
-            constructor(sessionId) {
-                this.sessionId = sessionId;
+            constructor() {
+                this.sessionId = "OFFLINE";
                 this.playerSubscription = null;
                 this.worldChangesSubscription = null;
-                this.init();
             }
 
-            async init() {
+            async fetchLobbies() {
+                if (!dbInstance) return;
+                const lobbyListEl = document.getElementById('lobby-list');
+                
+                try {
+                    // Wir nutzen die 'players' Tabelle, um aktive Welten zu finden
+                    // In einem echten System gäbe es eine 'lobbies' Tabelle, aber wir nutzen 'players' als Proxy
+                    const { data, error } = await dbInstance
+                        .from('players')
+                        .select('session_id, username')
+                        .gt('updated_at', new Date(Date.now() - 30000).toISOString()); // Nur Spieler der letzten 30s
+
+                    if (error) throw error;
+
+                    lobbyListEl.innerHTML = '';
+                    const sessions = {};
+                    data.forEach(p => {
+                        if (!sessions[p.session_id]) sessions[p.session_id] = { players: 0, host: p.username };
+                        sessions[p.session_id].players++;
+                    });
+
+                    const sKeys = Object.keys(sessions);
+                    if (sKeys.length === 0) {
+                        lobbyListEl.innerHTML = '<div class="text-xs text-gray-500 italic text-center py-4">Keine aktiven Welten gefunden.</div>';
+                    } else {
+                        sKeys.forEach(sid => {
+                            const div = document.createElement('div');
+                            div.className = "flex justify-between items-center bg-neutral-800 p-2 border-2 border-neutral-700 hover:border-green-500 cursor-pointer rounded";
+                            div.innerHTML = `
+                                <div>
+                                    <div class="text-xs font-bold text-white">${sid}</div>
+                                    <div class="text-[9px] text-gray-400">Host: ${sessions[sid].host}</div>
+                                </div>
+                                <div class="text-[10px] bg-green-900/50 text-green-400 px-2 py-0.5 rounded border border-green-500">${sessions[sid].players} Spieler</div>
+                            `;
+                            div.onclick = () => {
+                                document.getElementById('input-session-id').value = sid;
+                                showNotification(`Welt ${sid} ausgewählt!`);
+                            };
+                            lobbyListEl.appendChild(div);
+                        });
+                    }
+                } catch (e) {
+                    lobbyListEl.innerHTML = '<div class="text-xs text-red-500 text-center py-4">Lobby-Fehler</div>';
+                }
+            }
+
+            async join(sessionId) {
+                this.sessionId = sessionId;
                 if (!dbInstance) return;
                 
+                // Bestehende Abos kündigen
+                if (this.playerSubscription) this.playerSubscription.unsubscribe();
+                if (this.worldChangesSubscription) this.worldChangesSubscription.unsubscribe();
+
                 this.playerSubscription = dbInstance
-                    .channel('public:players')
-                    .on('postgres_changes', { event: '*', schema: 'public', table: 'players' }, payload => {
+                    .channel(`players:${this.sessionId}`)
+                    .on('postgres_changes', { 
+                        event: '*', 
+                        schema: 'public', 
+                        table: 'players',
+                        filter: `session_id=eq.${this.sessionId}` 
+                    }, payload => {
                         if (payload.eventType === 'DELETE') {
                             this.removeRemotePlayer(payload.old.id);
                             return;
                         }
                         const data = payload.new;
                         const pid  = data.id;
-                        if (pid === game.playerId) return;
-                        if (data && data.session_id === this.sessionId) {
-                            this.renderRemotePlayer(pid, data);
-                        }
+                        if (pid !== game.playerId) this.renderRemotePlayer(pid, data);
                     })
                     .subscribe();
 
                 this.worldChangesSubscription = dbInstance
-                    .channel('public:world_changes')
+                    .channel(`world:${this.sessionId}`)
                     .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'world_changes' }, payload => {
                         const data = payload.new;
                         if (data && data.session_id === this.sessionId && data.sender_id !== game.playerId) {
@@ -1345,12 +1403,13 @@
                     game.players[pid] = { group, username: data.username };
 
                     addChatMessage(`<span class="text-yellow-400 font-bold">${data.username} hat das Spiel betreten.</span>`, true);
-                    updateStatPlayersCount();
                 }
 
                 const playerGhost = game.players[pid].group;
-                playerGhost.position.set(data.x, data.y, data.z);
+                // Interpolation für flüssigere Bewegung
+                playerGhost.position.lerp(new THREE.Vector3(data.x, data.y, data.z), 0.2);
                 playerGhost.rotation.y = data.yaw;
+                updateStatPlayersCount();
             }
 
             removeRemotePlayer(pid) {
@@ -1365,7 +1424,7 @@
             sendLocalPosition() {
                 if (!dbInstance) return;
                 const now = Date.now();
-                if (now - game.lastSendTime < 100) return;
+                if (now - game.lastSendTime < 50) return; // 20 FPS Update-Rate
                 game.lastSendTime = now;
 
                 dbInstance
@@ -1375,7 +1434,7 @@
                         session_id: this.sessionId,
                         username: game.username,
                         x: camera.position.x,
-                        y: camera.position.y - EYE_LEVEL,
+                        y: camera.position.y - 1, // Leicht versetzt für Füße
                         z: camera.position.z,
                         yaw: controls.yaw,
                         updated_at: new Date().toISOString()
@@ -1533,8 +1592,14 @@
         const resumeBtn       = document.getElementById('btn-resume');
         const quitBtn         = document.getElementById('btn-quit');
         const optionsPauseBtn = document.getElementById('btn-options-pause');
+        const refreshLobbyBtn = document.getElementById('btn-refresh-lobby');
+
+        // Initiale Multiplayer-Logik
+        game.mpSession = new MultiplayerSession();
 
         window.addEventListener('DOMContentLoaded', () => {
+            game.mpSession.fetchLobbies();
+            setInterval(() => { if (!game.isWorldLoaded) game.mpSession.fetchLobbies(); }, 10000);
             const randomKey = 'MC-' + Math.random().toString(36).substring(2, 7).toUpperCase();
             document.getElementById('input-session-id').placeholder = randomKey;
         });
@@ -1551,13 +1616,13 @@
             if (!sessId) sessId = document.getElementById('input-session-id').placeholder;
             game.sessionId = sessId;
             game.isMultiplayerActive = true;
-            game_gamemodes[game.playerId] = 'survival';
             
             document.getElementById('session-tag').innerText  = `SESSION: ${game.sessionId}`;
             document.getElementById('debug-key').innerText    = game.sessionId;
             document.getElementById('generating-screen').classList.remove('hidden');
 
-            game.mpSession = new MultiplayerSession(game.sessionId);
+            await game.mpSession.join(game.sessionId);
+            
             if (game.musicPlaying) {
                 AudioEngine.init();
                 AudioEngine.toggleMusic(true);
@@ -1633,6 +1698,8 @@
 
             loadNextChunk();
         });
+
+        refreshLobbyBtn.addEventListener('click', () => game.mpSession.fetchLobbies());
 
         resumeBtn.addEventListener('click', () => {
             container.requestPointerLock();
@@ -3089,6 +3156,11 @@
                 updateMining();
                 updatePositionDisplay();
                 updateDroppedItems();
+
+                // Multiplayer Position synchronisieren
+                if (game.isMultiplayerActive && game.mpSession) {
+                    game.mpSession.sendLocalPosition();
+                }
                 
                 // Mobs updaten
                 if (chunkUpdateTick % 2 === 0) {
