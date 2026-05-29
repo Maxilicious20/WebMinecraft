@@ -10,6 +10,8 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <!-- Supabase Client -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+    <!-- GLTF Loader für 3D Modelle -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap');
         
@@ -631,6 +633,8 @@
         let armGroup = null;
         let armMesh = null;
         let chunkUpdateTick = 0;
+
+        const gltfLoader = new THREE.GLTFLoader();
 
         // --- SOUND ENGINE ---
         const AudioEngine = {
@@ -2039,9 +2043,197 @@
             });
         }
 
+        // --- MOB SYSTEM ---
+        const MOB_DEFINITIONS = {
+            'zombie': {
+                health: 20,
+                size: [0.6, 1.8, 0.6], // w, h, d
+                colors: { head: 0x008800, body: 0x00aa00, limb: 0x006600 },
+                speed: 0.035,
+                damage: 2,
+                aggroRange: 15,
+                burnsInSun: true
+            },
+            'schwein': {
+                health: 10,
+                size: [0.8, 0.8, 1.2],
+                colors: { body: 0xffaabb, head: 0xffccdd, limb: 0xcc8899 },
+                speed: 0.015,
+                damage: 0,
+                aggroRange: 0,
+                burnsInSun: false
+            },
+            'kuh': {
+                health: 10,
+                size: [0.9, 1.3, 1.4],
+                colors: { body: 0x553300, head: 0x885522, limb: 0x331100 },
+                speed: 0.015,
+                damage: 0,
+                aggroRange: 0,
+                burnsInSun: false
+            }
+        };
+
+        // --- MOB SYSTEM ---
+        class Mob {
+            constructor(type, x, z) {
+                this.type = type; // 'zombie', 'schwein', 'kuh'
+                this.def = MOB_DEFINITIONS[type];
+                this.health = this.def.health;
+                this.size = this.def.size;
+
+                this.group = new THREE.Group();
+                this.createVisuals();
+
+                let spawnY = 0; // Nur eine Deklaration
+                for (let y_check = CHUNK_HEIGHT - 1; y_check >= 0; y_check--) {
+                    const blockId = getGlobalBlock(x, y_check, z);
+                    if (blockId > 0 && blockId !== 14) { 
+                        spawnY = y_check + 1;
+                        break;
+                    }
+                }
+                
+                if (getGlobalBlock(x, spawnY - 1, z) === 14) spawnY = SEA_LEVEL + 1;
+
+                this.group.position.set(x, spawnY + this.size[1] / 2, z);
+                scene.add(this.group);
+                this.nextMove = 0;
+                this.nextStateChange = 0;
+                this.isWalking = false;
+                this.velocity = new THREE.Vector3();
+                this.lastBurnTime = 0;
+                this.mixer = null; // Für Animationen
+            }
+
+            createVisuals() {
+                this.group.clear();
+                const colors = this.def.colors;
+
+                if (this.type === 'zombie') {
+                    // Platzhalter Box solange Modell lädt
+                    const placeholder = new THREE.Mesh(
+                        new THREE.BoxGeometry(0.6, 1.8, 0.6), 
+                        new THREE.MeshStandardMaterial({ color: 0x00aa00, transparent: true, opacity: 0.5 })
+                    );
+                    this.group.add(placeholder);
+                    this.mesh = placeholder;
+
+                    // Lade das .glb Modell
+                    gltfLoader.load('./mob/zombie.glb', (gltf) => {
+                        this.group.remove(placeholder);
+                        const model = gltf.scene;
+                        model.scale.set(0.9, 0.9, 0.9);
+                        model.position.y = -this.size[1] / 2; // Zentrieren
+                        this.group.add(model);
+
+                        this.mesh = model;
+                        model.traverse(child => {
+                            if (child.isMesh) child.userData.mob = this;
+                        });
+
+                        if (gltf.animations.length > 0) {
+                            this.mixer = new THREE.AnimationMixer(model);
+                            this.mixer.clipAction(gltf.animations[0]).play();
+                        }
+                    });
+                } else if (this.type === 'schwein') {
+                    // Body
+                    const bodyGeo = new THREE.BoxGeometry(0.8, 0.8, 1.2);
+                    const bodyMat = new THREE.MeshStandardMaterial({ color: colors.body });
+                    const body = new THREE.Mesh(bodyGeo, bodyMat);
+                    body.position.y = 0.4;
+                    this.group.add(body);
+                    this.mesh = body;
+                } else if (this.type === 'kuh') {
+                    // Body
+                    const bodyGeo = new THREE.BoxGeometry(0.9, 0.9, 1.4);
+                    const bodyMat = new THREE.MeshStandardMaterial({ color: colors.body });
+                    const body = new THREE.Mesh(bodyGeo, bodyMat);
+                    body.position.y = 0.6;
+                    this.group.add(body);
+                    this.mesh = body;
+                }
+                this.mesh.userData.mob = this; // Referenz zum Mob-Objekt
+            }
+
+            update() {
+                const dist = camera.position.distanceTo(this.group.position);
+                const sineAngle = Math.sin(game.timeOfDay * Math.PI * 2);
+                const isDay = sineAngle > 0.15;
+                const now = Date.now();
+
+                if (this.mixer) this.mixer.update(0.016); // Animationen updaten
+
+                // Zombie-Verhalten
+                if (this.type === 'zombie') {
+                    // Tagsüber verbrennen
+                    if (isDay) {
+                        const headY = this.group.position.y + this.size[1] / 2;
+                        if (getGlobalBlock(this.group.position.x, headY + 0.5, this.group.position.z) === 0) { // Exposed to sky
+                            if (Date.now() - this.lastBurnTime > 1000) {
+                                this.takeDamage(1);
+                                this.lastBurnTime = Date.now();
+                            }
+                        }
+                    }
+                    // Aggro-Verhalten
+                    if (dist < this.def.aggroRange) {
+                        this.isWalking = true;
+                    const dir = camera.position.clone().sub(this.group.position);
+                    dir.y = 0; dir.normalize();
+                    this.group.position.addScaledVector(dir, this.def.speed);
+                    this.group.lookAt(camera.position.x, this.group.position.y, camera.position.z);
+                    if (dist < 1.4) takeDamage(this.def.damage); // Zombie attack
+                    }
+                }
+                
+                // KI Zustandswechsel (Drehen/Laufen/Warten)
+                if (now > this.nextStateChange) {
+                    this.isWalking = Math.random() > 0.4;
+                    this.group.rotation.y = Math.random() * Math.PI * 2;
+                    this.nextStateChange = now + 1000 + Math.random() * 4000;
+                }
+
+                // Bewegung für passive Mobs oder Zombies außer Reichweite
+                if (this.isWalking && (this.type !== 'zombie' || dist >= this.def.aggroRange)) {
+                    const forward = new THREE.Vector3(0,0,1).applyQuaternion(this.group.quaternion);
+                    this.group.position.addScaledVector(forward, this.def.speed);
+                }
+
+                const gy = game.noiseGen.getHeight(this.group.position.x, this.group.position.z);
+                if (this.group.position.y < gy) this.group.position.y = gy;
+                else if (this.group.position.y > gy) this.group.position.y -= 0.1;
+                // Einfache Gravitation (kein Snapping mehr, wichtig für Höhlen!)
+                const bx = Math.floor(this.group.position.x);
+                const by = Math.floor(this.group.position.y - this.size[1]/2);
+                const bz = Math.floor(this.group.position.z);
+                const blockBelow = getGlobalBlock(bx, by - 1, bz);
+                if (blockBelow === 0 || blockBelow === 14) {
+                    this.group.position.y -= 0.1; // Fallen
+                }
+            }
+
+            takeDamage(amt) {
+                this.health -= amt;
+                this.group.traverse(child => {
+                    if (child.isMesh && child.material.emissive) {
+                        child.material.emissive.setHex(0xff0000);
+                        setTimeout(() => { if(child.material) child.material.emissive.setHex(0x000000); }, 150);
+                    }
+                });
+
+                if (this.health <= 0) {
+                    scene.remove(this.group);
+                    return true;
+                }
+                return false;
+            }
+        }
+
         function breakBlock(pos, blockId) {
             // Spawne das Item in der Welt statt es direkt ins Inventar zu legen
-            if (blockId > 0 && blockId !== 14 && blockId !== 15) {
+            if (blockId > 0 && blockId !== 14 && blockId !== 15 && blockId !== 13) { // TNT droppt nicht
                 spawnDroppedItem(pos, blockId);
             }
 
@@ -2050,10 +2242,19 @@
                 tntMesh.position.copy(pos);
                 scene.add(tntMesh);
                 setGlobalBlock(pos.x, pos.y, pos.z, 0);
+                
+                let flash = false;
+                const flashInt = setInterval(() => {
+                    flash = !flash;
+                    tntMesh.material.color.setHex(flash ? 0xff0000 : 0xffffff); // Rot-Weiß Blinken
+                    tntMesh.scale.setScalar(flash ? 1.15 : 1.0);
+                }, 250);
+
                 setTimeout(() => {
+                    clearInterval(flashInt);
                     scene.remove(tntMesh);
                     triggerTNTExplosion(pos);
-                }, 2000);
+                }, 2000); // 2 Sekunden bis Explosion
             } else {
                 setGlobalBlock(pos.x, pos.y, pos.z, 0);
                 AudioEngine.playHit(blockId);
@@ -2105,6 +2306,21 @@
             }
         }
 
+        function updateMobRaycast() {
+            const center = new THREE.Vector2(0, 0);
+            raycaster.setFromCamera(center, camera);
+            const mobGroups = game.activeMobs.map(m => m.group);
+            const intersects = raycaster.intersectObjects(mobGroups, true);
+            for (let intersect of intersects) {
+                let obj = intersect.object;
+                while (obj) {
+                    if (obj.userData.mob) return obj.userData.mob;
+                    obj = obj.parent;
+                }
+            }
+            return null;
+        }
+
         function triggerSwing() {
             if (isSwinging) return;
             isSwinging = true;
@@ -2130,6 +2346,14 @@
             if (e.button === 0) {
                 game.isMouseDown = true;
                 triggerSwing();
+                
+                const mob = updateMobRaycast();
+                if (mob) {
+                    if (mob.takeDamage(6)) {
+                        game.activeMobs = game.activeMobs.filter(m => m !== mob);
+                    }
+                    return;
+                }
             } else if (e.button === 2) {
                 triggerSwing();
                 const target = updateRaycast();
@@ -2253,6 +2477,14 @@
 
         function triggerTNTExplosion(pos) {
             AudioEngine.playExplosion();
+            
+            // Schaden an Spieler
+            const dist = camera.position.distanceTo(pos);
+            if (dist < 6) {
+                const dmg = Math.floor((1 - dist / 6) * 18) + 2;
+                takeDamage(dmg);
+            }
+
             const radius = 3;
             for (let dx = -radius; dx <= radius; dx++) {
                 for (let dy = -radius; dy <= radius; dy++) {
@@ -2269,7 +2501,7 @@
 
         // --- TAG & NACHTZYKLUS ---
         function updateDayNightCycle() {
-            game.timeOfDay += 0.0001388; // Beschleunigt: Ein voller Zyklus dauert ca. 2 Min (Tag ca. 1 Min)
+            game.timeOfDay += 0.00000694; // 24 Minuten Zyklus (12 Min Tag, 12 Min Nacht)
             if (game.timeOfDay > 1) game.timeOfDay = 0;
 
             const angle     = game.timeOfDay * Math.PI * 2;
@@ -2857,6 +3089,30 @@
                 updateMining();
                 updatePositionDisplay();
                 updateDroppedItems();
+                
+                // Mobs updaten
+                if (chunkUpdateTick % 2 === 0) {
+                    game.activeMobs.forEach(m => m.update());
+                }
+
+                // Mob Spawning Logik (wiederhergestellt)
+                if (Math.random() < 0.002 && game.activeMobs.length < 20) {
+                    const spawnX = camera.position.x + (Math.random() - 0.5) * 64;
+                    const spawnZ = camera.position.z + (Math.random() - 0.5) * 64;
+                    const mobTypes = ['zombie', 'schwein', 'kuh'];
+                    let selectedType = mobTypes[Math.floor(Math.random() * mobTypes.length)];
+
+                    const sAngle = Math.sin(game.timeOfDay * Math.PI * 2);
+                    const isNightTime = sAngle < -0.15;
+                    const surfaceY = game.noiseGen.getHeight(spawnX, spawnZ);
+                    const isInsideCave = getGlobalBlock(Math.floor(spawnX), Math.floor(surfaceY) + 1, Math.floor(spawnZ)) !== 0;
+
+                    // Zombies spawnen nur nachts oder in Höhlen
+                    if (selectedType === 'zombie' && !isNightTime && !isInsideCave) {
+                        selectedType = mobTypes[Math.floor(Math.random() * (mobTypes.length - 1)) + 1];
+                    }
+                    game.activeMobs.push(new Mob(selectedType, spawnX, spawnZ));
+                }
             }
 
             chunkUpdateTick++;
