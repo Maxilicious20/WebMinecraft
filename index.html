@@ -3,15 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Minecraft Web Sandbox - Infinite Dev v2.1</title>
+    <title>Minecraft Web Edition/title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Three.js -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <!-- Firebase Legacy SDKs für Kompatibilität -->
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+    <!-- Supabase Client -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap');
         
@@ -484,39 +482,18 @@
     <script>
         // --- MULTIPLAYER & DATABASE SETUP ---
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'minecraft-sandbox-v2-0';
-        let firebaseConfig = null;
-        let db = null;
-        let auth = null;
-        let userLoaded = false;
-        let isMultiplayerActive = false;
-        let sessionListener = null;
+        let supabase = null;
 
-        if (typeof __firebase_config !== 'undefined' && __firebase_config) {
-            try {
-                firebaseConfig = JSON.parse(__firebase_config);
-                firebase.initializeApp(firebaseConfig);
-                db = firebase.firestore();
-                auth = firebase.auth();
-            } catch (err) {
-                console.warn("Firebase-Konfiguration konnte nicht geladen werden.", err);
-            }
+        // Supabase Initialisierung
+        async function initSupabase() {
+            const supabaseUrl = 'https://tgxywigqlfnksjmifylk.supabase.co';
+            const supabaseKey = 'sb_publishable_O3i-TxfAeevRXm2lYvkDrg_UoupN_ti';
+            
+            supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+            return supabase;
         }
 
-        async function initializeDatabaseAuth() {
-            if (!auth || !db) return;
-            try {
-                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                    await auth.signInWithCustomToken(__initial_auth_token);
-                } else {
-                    await auth.signInAnonymously();
-                }
-                userLoaded = true;
-                console.log("Firebase erfolgreich authentifiziert.");
-            } catch(e) {
-                console.error("Firebase Authentifizierung fehlgeschlagen", e);
-            }
-        }
-        initializeDatabaseAuth();
+        initSupabase().catch(err => console.warn("Supabase-Initialisierung fehlgeschlagen:", err));
 
         // --- OPTIMIERTE CHUNK CONFIG ---
         const CHUNK_SIZE_XZ = 16;
@@ -1113,56 +1090,42 @@
         class MultiplayerSession {
             constructor(sessionId) {
                 this.sessionId = sessionId;
-                this.playerRef = null;
-                this.worldChangesRef = null;
+                this.playerSubscription = null;
+                this.worldChangesSubscription = null;
                 this.init();
             }
 
             async init() {
-                if (!db) return;
+                if (!supabase) return;
                 
-                // Rule 1: Pfadkonformität (/artifacts/{appId}/public/data/{collectionName})
-                this.playerRef = db.collection('artifacts').doc(appId)
-                                   .collection('public').doc('data')
-                                   .collection('players');
-
-                this.worldChangesRef = db.collection('artifacts').doc(appId)
-                                         .collection('public').doc('data')
-                                         .collection('worldChanges');
-
-                // Listener für andere Spieler (Ohne systemseitigen query-Filter zur Vermeidung von Index-Fehlern)
-                this.playerRef.onSnapshot(snap => {
-                    snap.docChanges().forEach(change => {
-                        const pid = change.doc.id;
+                // Listener für andere Spieler
+                this.playerSubscription = supabase
+                    .from('players')
+                    .on('*', payload => {
+                        const data = payload.new;
+                        const pid = data.id;
+                        
                         if (pid === game.playerId) return;
-
-                        if (change.type === 'added' || change.type === 'modified') {
-                            const data = change.doc.data();
-                            if (data && data.sessionId === this.sessionId) {
-                                this.renderRemotePlayer(pid, data);
-                            } else {
-                                this.removeRemotePlayer(pid);
-                            }
-                        } else if (change.type === 'removed') {
+                        
+                        if (data && data.session_id === this.sessionId) {
+                            this.renderRemotePlayer(pid, data);
+                        } else {
                             this.removeRemotePlayer(pid);
                         }
-                    });
-                }, err => console.warn("Multiplayer-Listener Fehler:", err));
+                    })
+                    .subscribe();
 
-                // Listener für Platzierungen (Ohne systemseitigen query-Filter zur Vermeidung von Index-Fehlern)
-                this.worldChangesRef.onSnapshot(snap => {
-                    snap.docChanges().forEach(change => {
-                        if (change.type === 'added' || change.type === 'modified') {
-                            const data = change.doc.data();
-                            if (data && data.sessionId === this.sessionId) {
-                                if (data.senderId === game.playerId) return;
-                                
-                                const [gx, gy, gz] = data.coords.split(',').map(Number);
-                                setGlobalBlock(gx, gy, gz, data.blockId, false);
-                            }
+                // Listener für Welt-Änderungen
+                this.worldChangesSubscription = supabase
+                    .from('world_changes')
+                    .on('INSERT', payload => {
+                        const data = payload.new;
+                        if (data && data.session_id === this.sessionId && data.sender_id !== game.playerId) {
+                            const [gx, gy, gz] = data.coords.split(',').map(Number);
+                            setGlobalBlock(gx, gy, gz, data.block_id, false);
                         }
-                    });
-                }, err => console.warn("WorldChanges-Listener Fehler:", err));
+                    })
+                    .subscribe();
             }
 
             renderRemotePlayer(pid, data) {
@@ -1201,38 +1164,54 @@
             }
 
             sendLocalPosition() {
-                if (!this.playerRef) return;
+                if (!supabase) return;
                 const now = Date.now();
                 if (now - game.lastSendTime < 100) return;
                 game.lastSendTime = now;
 
-                this.playerRef.doc(game.playerId).set({
-                    sessionId: this.sessionId,
-                    username: game.username,
-                    x: camera.position.x,
-                    y: camera.position.y - 1.6,
-                    z: camera.position.z,
-                    yaw: controls.yaw,
-                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-                }).catch(e => console.warn("Upload Position Fehler:", e));
+                supabase
+                    .from('players')
+                    .upsert({
+                        id: game.playerId,
+                        session_id: this.sessionId,
+                        username: game.username,
+                        x: camera.position.x,
+                        y: camera.position.y - 1.6,
+                        z: camera.position.z,
+                        yaw: controls.yaw,
+                        updated_at: new Date().toISOString()
+                    })
+                    .then(({ data, error }) => {
+                        if (error) console.warn("Upload Position Fehler:", error);
+                    });
             }
 
             sendBlockChange(coords, blockId) {
-                if (!this.worldChangesRef) return;
+                if (!supabase) return;
                 const changeId = `${this.sessionId}_${coords}_${Date.now()}`;
-                this.worldChangesRef.doc(changeId).set({
-                    sessionId: this.sessionId,
-                    coords: coords,
-                    blockId: blockId,
-                    senderId: game.playerId,
-                    timestamp: firebase.firestore.FieldValue.serverTimestamp()
-                }).catch(e => console.warn("Upload Block Fehler:", e));
+                supabase
+                    .from('world_changes')
+                    .insert({
+                        id: changeId,
+                        session_id: this.sessionId,
+                        coords: coords,
+                        block_id: blockId,
+                        sender_id: game.playerId,
+                        timestamp: new Date().toISOString()
+                    })
+                    .then(({ data, error }) => {
+                        if (error) console.warn("Upload Block Fehler:", error);
+                    });
             }
         }
 
         window.addEventListener('beforeunload', () => {
-            if (game.mpSession && game.mpSession.playerRef) {
-                game.mpSession.playerRef.doc(game.playerId).delete().catch(() => {});
+            if (game.mpSession && supabase) {
+                supabase
+                    .from('players')
+                    .delete()
+                    .eq('id', game.playerId)
+                    .catch(() => {});
             }
         });
 
@@ -1390,11 +1369,6 @@
 
             // Zeige Ladebildschirm
             document.getElementById('generating-screen').classList.remove('hidden');
-
-            // Authentifizierung
-            if (!userLoaded) {
-                await initializeDatabaseAuth();
-            }
 
             game.mpSession = new MultiplayerSession(game.sessionId);
             listenToChat();
@@ -2284,15 +2258,17 @@
                 const displayMsg = `<span class="text-yellow-400 font-bold">${game.username}</span>: ${msg}`;
                 addChatMessage(displayMsg, false);
 
-                if (isMultiplayerActive && db) {
-                    db.collection('artifacts').doc(appId)
-                      .collection('public').doc('data')
-                      .collection('chat').add({
-                          sessionId: game.sessionId,
-                          username: game.username,
-                          message: msg,
-                          timestamp: firebase.firestore.FieldValue.serverTimestamp()
-                      }).catch(e => console.warn("Chat Fehler:", e));
+                if (isMultiplayerActive && supabase) {
+                    supabase
+                        .from('chat')
+                        .insert({
+                            id: `${game.playerId}_${Date.now()}`,
+                            session_id: game.sessionId,
+                            username: game.username,
+                            message: msg,
+                            timestamp: new Date().toISOString()
+                        })
+                        .catch(e => console.warn("Chat Fehler:", e));
                 }
             }
             closeChat();
@@ -2378,35 +2354,20 @@
         const renderedMessages = new Set();
 
         function listenToChat() {
-            if (!isMultiplayerActive || !db) return;
+            if (!isMultiplayerActive || !supabase) return;
             
-            db.collection('artifacts').doc(appId)
-              .collection('public').doc('data')
-              .collection('chat')
-              .onSnapshot(snap => {
-                  const newMsgs = [];
-                  snap.forEach(doc => {
-                      const data = doc.data();
-                      // Überprüfe die Sessionzugehörigkeit lokal im Speicher, um den Firestore-Index-Zwang zu umgehen
-                      if (data && data.sessionId === game.sessionId && !renderedMessages.has(doc.id)) {
-                          newMsgs.push({ id: doc.id, ...data });
-                      }
-                  });
-
-                  // Sortiere die eintreffenden Nachrichten clientseitig nach Zeitstempel
-                  newMsgs.sort((a, b) => {
-                      const tA = a.timestamp ? (a.timestamp.seconds || a.timestamp) : 0;
-                      const tB = b.timestamp ? (b.timestamp.seconds || b.timestamp) : 0;
-                      return tA - tB;
-                  });
-
-                  newMsgs.forEach(msg => {
-                      renderedMessages.add(msg.id);
-                      if (msg.username !== game.username) {
-                          addChatMessage(`<span class="text-cyan-400 font-bold">${msg.username}</span>: ${msg.message}`);
-                      }
-                  });
-              }, err => console.warn("Chat-Listener Fehler:", err));
+            supabase
+                .from('chat')
+                .on('INSERT', payload => {
+                    const data = payload.new;
+                    if (data && data.session_id === game.sessionId && !renderedMessages.has(data.id)) {
+                        renderedMessages.add(data.id);
+                        if (data.username !== game.username) {
+                            addChatMessage(`<span class="text-cyan-400 font-bold">${data.username}</span>: ${data.message}`, false);
+                        }
+                    }
+                })
+                .subscribe();
         }
 
         // --- TOAST NOTIFICATIONS ---
