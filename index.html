@@ -255,41 +255,49 @@
     </div>
 
     <!-- INVENTORY SCREEN OVERLAY -->
-    <div id="inventory-overlay" class="hidden absolute inset-0 z-30 flex items-center justify-center bg-black/80">
-        <div class="w-[520px] max-w-full p-6 mc-border flex flex-col gap-4">
+    <div id="inventory-overlay" class="hidden absolute inset-0 z-30 flex items-center justify-center bg-black/90">
+        <div class="w-[720px] max-w-full p-6 mc-border flex flex-col gap-4">
             <div class="flex justify-between items-center border-b-4 border-[#1d1d1d] pb-2 mb-1">
-                <h3 class="text-2xl font-bold tracking-wider mc-font-pixel text-yellow-400 text-[10px]">INVENTAR & CRAFTING</h3>
+                <h3 class="text-2xl font-bold tracking-wider mc-font-pixel text-yellow-400 text-[10px]">INVENTAR</h3>
                 <button id="btn-inventory-close" class="px-3 py-1 mc-button text-xs">X</button>
             </div>
-            
+
             <div class="flex gap-4">
-                <!-- Inventargrid -->
-                <div class="w-1/2">
-                    <span class="text-xs font-bold text-cyan-400 block mb-1">DEINE ITEMS</span>
-                    <div class="grid grid-cols-4 gap-2 p-2 bg-neutral-900 border-4 border-[#1c1c1c] rounded-sm max-h-48 overflow-y-auto" id="inventory-grid"></div>
-                </div>
-
-                <!-- Einfaches Crafting-System -->
-                <div class="w-1/2 p-2 bg-neutral-800 rounded border border-white/10 flex flex-col justify-between">
-                    <div>
-                        <span class="text-xs font-bold text-cyan-400 block mb-2">REZEPTE</span>
-                        <div class="space-y-1.5 text-sm" id="crafting-list">
-                            <!-- Dynamische Rezepte -->
+                <div class="flex-1 space-y-3">
+                    <div class="space-y-2">
+                        <div class="flex items-center justify-between text-xs font-bold text-cyan-400 uppercase tracking-wider">
+                            <span>Hotbar</span>
+                            <span>Klicke auf einen Slot, um ihn zu markieren</span>
                         </div>
+                        <div id="inventory-hotbar-row" class="grid grid-cols-9 gap-2 p-2 bg-neutral-900 border-4 border-[#1c1c1c] rounded-sm"></div>
                     </div>
-                    <div class="mt-2 text-xs text-gray-400">Klicke auf ein Rezept, um Gegenstände herzustellen!</div>
+
+                    <div class="space-y-2">
+                        <div class="flex items-center justify-between text-xs font-bold text-cyan-400 uppercase tracking-wider">
+                            <span>Inventar</span>
+                            <span>Maximaler Stack: 64</span>
+                        </div>
+                        <div id="inventory-grid" class="grid grid-cols-9 gap-2 p-2 bg-neutral-900 border-4 border-[#1c1c1c] rounded-sm"></div>
+                    </div>
                 </div>
-            </div>
 
-            <div class="flex gap-2 justify-between items-center text-sm border-t border-white/10 pt-2">
-                <span>Ausgewählt: <span id="selected-qty-text" class="text-white font-bold">-</span></span>
-                <button id="btn-gain-blocks" class="mc-button px-3 py-1 font-bold uppercase text-[9px]">Stack auffüllen (+64)</button>
-            </div>
+                <div class="w-[240px] flex flex-col gap-3">
+                    <div class="p-3 bg-neutral-900 rounded border border-white/10">
+                        <div class="text-xs font-bold text-cyan-400 uppercase tracking-wider mb-2">Ausgewählte Slot-Info</div>
+                        <div id="selected-slot-info" class="text-sm text-white">Wähle einen Inventar- oder Hotbar-Slot aus.</div>
+                    </div>
 
-            <!-- Schnellleiste zuweisen -->
-            <div class="p-2 bg-neutral-800 rounded border border-white/10">
-                <span class="text-xs font-bold block mb-1 text-cyan-400">SCHNELL-LEISTE BELEGEN:</span>
-                <div class="flex gap-1 justify-between" id="inventory-hotbar-assigner"></div>
+                    <div class="p-3 bg-neutral-900 rounded border border-white/10 space-y-2">
+                        <button id="btn-assign-hotbar" class="w-full mc-button py-2 text-[11px] font-bold uppercase">In Hotbar einfügen</button>
+                        <button id="btn-auto-hotbar" class="w-full mc-button py-2 text-[11px] font-bold uppercase">Hotbar automatisch füllen</button>
+                        <button id="btn-clear-selection" class="w-full mc-button py-2 text-[11px] font-bold uppercase">Auswahl zurücksetzen</button>
+                    </div>
+
+                    <div class="p-3 bg-neutral-900 rounded border border-white/10 flex-1 overflow-auto">
+                        <div class="text-xs font-bold text-cyan-400 uppercase tracking-wider mb-2">Rezepte</div>
+                        <div id="crafting-list" class="space-y-1 text-sm"></div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -526,6 +534,16 @@
                         noise = Math.sin(x * 0.5) * 10 + Math.cos(y * 0.5) * 10;
                         // Flaches blaues Wasser ohne Rauschen für besseren Look
                         noise = 0;
+                    } else if (type === 'unknown') {
+                        // Rote Warnblock-Textur mit Fragezeichen
+                        ctx.fillStyle = colorBase;
+                        ctx.fillRect(0, 0, 16, 16);
+                        ctx.fillStyle = '#ffffff';
+                        ctx.font = 'bold 12px monospace';
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'middle';
+                        ctx.fillText('?', 8, 8);
+                        break;
                     }
 
                     const nr = Math.max(0, Math.min(255, rgb.r + noise));
@@ -577,7 +595,9 @@
             timeOfDay: 0.35,     
             playerChunk: { x: null, z: null },
             inventoryOpen: false,
-            selectedInventoryBlockId: 1, 
+            selectedInventorySlot: null,
+            selectedHotbarSlotIndex: null,
+            inventorySlots: Array.from({ length: 36 }, () => ({ blockId: 0, count: 0 })),
             worldKey: "Default",
             worldSeed: "BLOCKWORLD", 
             noiseGen: null, 
@@ -591,27 +611,6 @@
             miningTarget: null,
             miningProgress: 0,
             isMouseDown: false,
-            inventory: {
-                1: 0,
-                2: 0,
-                3: 0,
-                4: 0,
-                5: 0,
-                6: 0,
-                7: 0,
-                8: 0,
-                9: 0,
-                10: 0,
-                11: 0,
-                13: 0,
-                14: 0,
-                15: 0,
-                16: 0,
-                17: 0,
-                18: 0, // Kohle
-                19: 0, // Eisen
-                20: 0  // Gold
-            },
             username: "Steve",
             sessionId: "OFFLINE",
             isMultiplayerActive: false,
@@ -630,7 +629,19 @@
             droppedItems: [],
         };
 
-        const hotbarAssigned = [1, 2, 3, 4, 5, 6, 7, 8, 13];
+        const CLIENT_VERSION = "2.1.0";
+        const UNKNOWN_BLOCK_DEF = {
+            id: -1,
+            name: "Unbekannter Block",
+            textureName: "unknown_block",
+            miningTime: 1.0,
+            transparent: false,
+            color: '#ff2d2d',
+            textures: ['#ff2d2d','#ff2d2d','#ff2d2d','#ff2d2d','#ff2d2d','#ff2d2d'],
+            types: ['unknown','unknown','unknown','unknown','unknown','unknown'],
+            isUnknown: true
+        };
+
         let chunkRebuildQueue = [];
         let isSwinging = false;
         let swingTimer = 0;
@@ -847,14 +858,15 @@
             { id: 17, name: "Werkbank",     textureName: "werkbank",    miningTime: 3.75, transparent: false, color: '#7a5a3a', textures: ['#7a5a3a','#7a5a3a','#9c794a','#9c794a','#7a5a3a','#7a5a3a'], types: ['stone','stone','dirt','dirt','stone','stone'] },
             { id: 18, name: "Kohleerz",     textureName: "kohle",       miningTime: 15.0, transparent: false, color: '#222222', textures: ['#737373','#737373','#737373','#737373','#737373','#737373'], types: ['stone','stone','stone','stone','stone','stone'] },
             { id: 19, name: "Eisenerz",     textureName: "eisen",       miningTime: 25.0, transparent: false, color: '#d8af93', textures: ['#737373','#737373','#737373','#737373','#737373','#737373'], types: ['stone','stone','stone','stone','stone','stone'] },
-            { id: 20, name: "Golderz",      textureName: "gold",        miningTime: 40.0, transparent: false, color: '#fcee4b', textures: ['#737373','#737373','#737373','#737373','#737373','#737373'], types: ['stone','stone','stone','stone','stone','stone'] }
+            { id: 20, name: "Golderz",      textureName: "gold",        miningTime: 40.0, transparent: false, color: '#fcee4b', textures: ['#737373','#737373','#737373','#737373','#737373','#737373'], types: ['stone','stone','stone','stone','stone','stone'] },
         ];
 
         const materialCache = {};
         const BLOCK_DEFS_BY_ID = {};
         BLOCKS.forEach(block => { BLOCK_DEFS_BY_ID[block.id] = block; });
         function getBlockDef(blockId) {
-            return BLOCK_DEFS_BY_ID[blockId] || null;
+            if (!blockId) return null;
+            return BLOCK_DEFS_BY_ID[blockId] || UNKNOWN_BLOCK_DEF;
         }
 
         function getBlockMaterials(blockDef) {
@@ -887,9 +899,8 @@
         async function loadTexturesFromFolder() {
             console.log("Starte Textur-Ladevorgang aus dem /textures/ Ordner...");
             const textureNames = [
-                'grasblock','erde','stein','pflasterstein','eichenholz','laub',
-                'holzblock','ziegelstein','glasblock','sand','kaktus','tnt',
-                'wasser','lava','stocke','werkbank',
+                'grasblock','erde','stein','eichenholz','laub',
+                'holzblock','sand','kaktus','tnt',
                 'kohle', 'eisen', 'gold'
             ];
             
@@ -963,6 +974,10 @@
         const dirLight = new THREE.DirectionalLight(0xffffff, 0.85);
         dirLight.position.set(15, 45, 10);
         scene.add(dirLight);
+        // Mond-Licht (sanfter, kühler Lichtgeber für Nacht)
+        const moonLight = new THREE.DirectionalLight(0x99aaff, 0.06);
+        moonLight.position.set(-15, -45, -10);
+        scene.add(moonLight);
 
         // ─────────────────────────────────────────────────────────
         // FIX: Alle Himmelsobjekte NUR EINMAL deklarieren
@@ -1054,17 +1069,17 @@
                 const moisture = this.noiseGen.fbm(x * 0.004 + 500, z * 0.004 + 500, 2);
 
                 if (heat > 0.65 && moisture < 0.4) {
-                    return { name: "Desert",   heightOffset: 10, scale: 5,  topBlock: 10, subBlock: 10 };
+                    return { name: "Desert",   heightOffset: 10, scale: 5,  topBlock: 10, subBlock: 10, treeChance: 0.03, flowerChance: 0.0 };
                 } else if (heat > 0.45 && moisture > 0.55) {
-                    return { name: "Swamp",    heightOffset: 8,  scale: 4,  topBlock: 1,  subBlock: 2 };
+                    return { name: "Swamp",    heightOffset: 8,  scale: 4,  topBlock: 1,  subBlock: 2, treeChance: 0.18, flowerChance: 0.04 };
                 } else if (heat > 0.3 && heat < 0.7 && moisture > 0.5) {
-                    return { name: "Forest",   heightOffset: 12, scale: 8,  topBlock: 1,  subBlock: 2 };
+                    return { name: "Forest",   heightOffset: 12, scale: 8,  topBlock: 1,  subBlock: 2, treeChance: 0.38, flowerChance: 0.08 };
                 } else if (heat < 0.35) {
-                    return { name: "Tundra",   heightOffset: 12, scale: 10, topBlock: 9,  subBlock: 3 }; // Nutze Glas als Schnee-Ersatz
+                    return { name: "Tundra",   heightOffset: 12, scale: 10, topBlock: 9,  subBlock: 3, treeChance: 0.02, flowerChance: 0.0 }; // Nutze Glas als Schnee-Ersatz
                 } else if (heat > 0.5 && moisture < 0.3) {
-                    return { name: "Mountain", heightOffset: 15, scale: 25, topBlock: 3,  subBlock: 3 };
+                    return { name: "Mountain", heightOffset: 15, scale: 25, topBlock: 3,  subBlock: 3, treeChance: 0.01, flowerChance: 0.0 };
                 } else {
-                    return { name: "Plains",   heightOffset: 12, scale: 6,  topBlock: 1,  subBlock: 2 };
+                    return { name: "Plains",   heightOffset: 12, scale: 6,  topBlock: 1,  subBlock: 2, treeChance: 0.12, flowerChance: 0.18 };
                 }
             }
 
@@ -1158,12 +1173,28 @@
                             }
                         }
 
+                        const seedValue = game.noiseGen.noiseGen.random2D(gx, gz);
                         if (x === 8 && z === 8) {
-                            const hash = game.noiseGen.noiseGen.random2D(gx, gz);
-                            if (b.name === "Forest" && hash > 0.4) {
-                                this.buildTree(x, finalHeight, z, 5, 6); 
-                            } else if (b.name === "Desert" && hash > 0.72) {
+                            if (b.name === "Forest" && seedValue > 0.35) {
+                                this.buildTree(x, finalHeight, z, 5, 6);
+                            } else if (b.name === "Plains" && seedValue > 0.92) {
+                                this.buildTree(x, finalHeight, z, 5, 6);
+                            } else if (b.name === "Desert" && seedValue > 0.72) {
                                 this.buildCactus(x, finalHeight, z);
+                            }
+                        }
+
+                        if (b.topBlock === 1 && finalHeight < CHUNK_HEIGHT - 2) {
+                            const decorationValue = game.noiseGen.noiseGen.random2D(gx * 1.5 + 3, gz * 1.5 + 5);
+                            if (decorationValue < b.flowerChance) {
+                                const flowerType = decorationValue < b.flowerChance * 0.45 ? 21 : 22;
+                                const aboveIndex = this.getIndex(x, finalHeight + 1, z);
+                                if (aboveIndex >= 0 && this.blocks[aboveIndex] === 0) {
+                                    this.blocks[aboveIndex] = flowerType;
+                                }
+                            }
+                            if (decorationValue > 0.88 && decorationValue < 0.92) {
+                                this.buildFlowerCluster(x, finalHeight, z, decorationValue < 0.90 ? 21 : 22);
                             }
                         }
                     }
@@ -1215,6 +1246,23 @@
                     const yPos = ty + ch;
                     if (yPos < CHUNK_HEIGHT) {
                         this.blocks[this.getIndex(tx, yPos, tz)] = 11;
+                    }
+                }
+            }
+
+            buildFlowerCluster(tx, ty, tz, blockId) {
+                const offsets = [
+                    [0, 0], [1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, -1]
+                ];
+                for (const [dx, dz] of offsets) {
+                    const px = tx + dx;
+                    const pz = tz + dz;
+                    const py = ty + 1;
+                    if (px >= 0 && px < CHUNK_SIZE_XZ && pz >= 0 && pz < CHUNK_SIZE_XZ && py < CHUNK_HEIGHT) {
+                        const idx = this.getIndex(px, py, pz);
+                        if (this.blocks[idx] === 0) {
+                            this.blocks[idx] = blockId;
+                        }
                     }
                 }
             }
@@ -1376,8 +1424,60 @@
                     activePlayers.forEach(p => {
                         if (p.id !== game.playerId) this.renderRemotePlayer(p.id, p);
                     });
+
+                    const mismatchedVersions = activePlayers.some(p => p.client_version && p.client_version !== CLIENT_VERSION);
+                    if (mismatchedVersions) {
+                        showNotification('Warnung: Diese Session enthält Spieler mit einer anderen Version. Kompatibilitätsprobleme möglich.');
+                        addChatMessage('<span class="text-red-400 font-bold">WARNUNG:</span> Versionen stimmen nicht überein. Einige Inhalte könnten falsch dargestellt werden.', true);
+                    }
                 }
                 updateStatPlayersCount();
+
+                // Lade und wende historische Welt-Änderungen an (damit neue Clients bereits gebaute Blöcke sehen)
+                try {
+                    const { data: changes, error: changesErr } = await dbInstance
+                        .from('world_changes')
+                        .select('*')
+                        .eq('session_id', this.sessionId)
+                        .order('timestamp', { ascending: true });
+                    if (changesErr) throw changesErr;
+                    if (changes && changes.length) {
+                        let unknownChanges = false;
+                        changes.forEach(c => {
+                            if (!c || !c.coords) return;
+                            const [gx, gy, gz] = c.coords.split(',').map(Number);
+                            const blockDef = getBlockDef(c.block_id);
+                            if (blockDef && blockDef.isUnknown) unknownChanges = true;
+                            setGlobalBlock(gx, gy, gz, c.block_id, false);
+                        });
+                        if (unknownChanges) {
+                            showNotification('Kompatibilitätswarnung: Diese Welt enthält unbekannte Blöcke. Unbekannte Blöcke werden als rote Barrieren angezeigt.');
+                            addChatMessage('<span class="text-red-400 font-bold">Achtung:</span> In dieser Welt wurden nicht erkannte Blöcke gefunden.', true);
+                        }
+                        // Rebuild all current chunks so changes become visible
+                        Object.values(game.chunks).forEach(ch => queueChunkRebuild(ch));
+                    }
+                } catch (e) {
+                    console.warn('Fehler beim Laden historischer Weltänderungen:', e);
+                }
+
+                // Sofort lokalen Spieler in DB registrieren (setzt initiale Position und Meta)
+                try {
+                    const { error: upsertError } = await dbInstance.from('players').upsert({
+                        id: game.playerId,
+                        session_id: this.sessionId,
+                        username: game.username,
+                        x: camera.position.x,
+                        y: camera.position.y - 1,
+                        z: camera.position.z,
+                        yaw: controls.yaw,
+                        client_version: CLIENT_VERSION,
+                        updated_at: new Date().toISOString()
+                    });
+                    if (upsertError) console.warn('Fehler beim Upsert des lokalen Spielers:', upsertError);
+                } catch (e) {
+                    console.warn('Fehler beim Upsert des lokalen Spielers:', e);
+                }
 
                 this.playerSubscription = dbInstance
                     .channel(`players_${this.sessionId}`)
@@ -1419,21 +1519,42 @@
 
             renderRemotePlayer(pid, data) {
                 if (!game.players[pid]) {
-                    const group   = new THREE.Group();
+                    const group = new THREE.Group();
+                    const skinColor = 0xa28060;
+                    const bodyColor = 0x3b82f6;
+                    const bootColor = 0x1f2937;
+
                     const headGeo = new THREE.BoxGeometry(0.4, 0.4, 0.4);
-                    const headMat = new THREE.MeshBasicMaterial({ color: 0x10b981 });
-                    const head    = new THREE.Mesh(headGeo, headMat);
-                    head.position.y = 0.7;
+                    const headMat = new THREE.MeshStandardMaterial({ color: skinColor, roughness: 0.8, metalness: 0.1 });
+                    const head = new THREE.Mesh(headGeo, headMat);
+                    head.position.y = 1.75;
                     group.add(head);
 
-                    const bodyGeo = new THREE.BoxGeometry(0.5, 0.7, 0.3);
-                    const bodyMat = new THREE.MeshBasicMaterial({ color: 0x3b82f6 });
-                    const body    = new THREE.Mesh(bodyGeo, bodyMat);
+                    const bodyGeo = new THREE.BoxGeometry(0.5, 0.7, 0.25);
+                    const bodyMat = new THREE.MeshStandardMaterial({ color: bodyColor, roughness: 0.8, metalness: 0.1 });
+                    const body = new THREE.Mesh(bodyGeo, bodyMat);
+                    body.position.y = 1.2;
                     group.add(body);
+
+                    const armGeo = new THREE.BoxGeometry(0.12, 0.5, 0.12);
+                    const leftArm = new THREE.Mesh(armGeo, bodyMat);
+                    leftArm.position.set(-0.35, 1.25, 0);
+                    group.add(leftArm);
+                    const rightArm = leftArm.clone();
+                    rightArm.position.set(0.35, 1.25, 0);
+                    group.add(rightArm);
+
+                    const legGeo = new THREE.BoxGeometry(0.14, 0.5, 0.14);
+                    const legMat = new THREE.MeshStandardMaterial({ color: bootColor, roughness: 0.85, metalness: 0.05 });
+                    const leftLeg = new THREE.Mesh(legGeo, legMat);
+                    leftLeg.position.set(-0.12, 0.6, 0);
+                    group.add(leftLeg);
+                    const rightLeg = leftLeg.clone();
+                    rightLeg.position.set(0.12, 0.6, 0);
+                    group.add(rightLeg);
 
                     scene.add(group);
                     game.players[pid] = { group, username: data.username };
-
                     addChatMessage(`<span class="text-yellow-400 font-bold">${data.username} hat das Spiel betreten.</span>`, true);
                 }
 
@@ -1471,11 +1592,34 @@
                         y: camera.position.y - 1, // Leicht versetzt für Füße
                         z: camera.position.z,
                         yaw: controls.yaw,
+                        client_version: CLIENT_VERSION,
                         updated_at: new Date().toISOString()
                     })
                     .then(({ data, error }) => {
                         if (error) console.warn("Upload Position Fehler:", error);
                     });
+
+                    // Keine zusätzliche Session-Tabelle synchronisieren, wenn sie nicht vorhanden ist.
+            }
+
+            async cleanupSessionIfEmpty() {
+                if (!dbInstance) return;
+                try {
+                    const { data: players, error: playerErr } = await dbInstance
+                        .from('players')
+                        .select('id')
+                        .eq('session_id', this.sessionId);
+                    if (playerErr) return;
+                    if (!players || players.length === 0) {
+                        await dbInstance
+                            .from('world_changes')
+                            .delete()
+                            .eq('session_id', this.sessionId);
+                        console.log('Session leer - world_changes gelöscht.');
+                    }
+                } catch (e) {
+                    console.warn('Fehler beim Aufräumen der Session:', e);
+                }
             }
 
             sendBlockChange(coords, blockId) {
@@ -1503,6 +1647,22 @@
                     .from('players')
                     .delete()
                     .eq('id', game.playerId)
+                    .then(async () => {
+                        if (game.mpSession) await game.mpSession.cleanupSessionIfEmpty();
+                    })
+                    .catch(() => {});
+            }
+        });
+
+        window.addEventListener('pagehide', () => {
+            if (game.mpSession && dbInstance) {
+                dbInstance
+                    .from('players')
+                    .delete()
+                    .eq('id', game.playerId)
+                    .then(async () => {
+                        if (game.mpSession) await game.mpSession.cleanupSessionIfEmpty();
+                    })
                     .catch(() => {});
             }
         });
@@ -1519,6 +1679,16 @@
             const rx = ((gx % CHUNK_SIZE_XZ) + CHUNK_SIZE_XZ) % CHUNK_SIZE_XZ;
             const rz = ((gz % CHUNK_SIZE_XZ) + CHUNK_SIZE_XZ) % CHUNK_SIZE_XZ;
             return chunk.blocks[chunk.getIndex(rx, gy, rz)];
+        }
+
+        // Prüft, ob eine Position direkten Blick zum Himmel hat (keine Blöcke darüber)
+        function isExposedToSky(x, y, z) {
+            const startY = Math.floor(y);
+            for (let yy = startY; yy < CHUNK_HEIGHT; yy++) {
+                const bid = getGlobalBlock(Math.floor(x), yy, Math.floor(z));
+                if (bid > 0) return false;
+            }
+            return true;
         }
 
         function setGlobalBlock(gx, gy, gz, blockId, syncOnline = true) {
@@ -1569,6 +1739,53 @@
                     chunk.rebuildQueued = false;
                     chunk.rebuildMesh();
                 }
+            }
+        }
+
+        function updateWaterPhysics() {
+            const updates = [];
+            const maxUpdates = 120;
+
+            for (const chunkKey of Object.keys(game.chunks)) {
+                if (updates.length >= maxUpdates) break;
+                const chunk = game.chunks[chunkKey];
+                for (let x = 0; x < CHUNK_SIZE_XZ && updates.length < maxUpdates; x++) {
+                    for (let z = 0; z < CHUNK_SIZE_XZ && updates.length < maxUpdates; z++) {
+                        for (let y = 0; y < CHUNK_HEIGHT && updates.length < maxUpdates; y++) {
+                            const idx = chunk.getIndex(x, y, z);
+                            if (chunk.blocks[idx] !== 14) continue;
+
+                            const gx = chunk.cx * CHUNK_SIZE_XZ + x;
+                            const gz = chunk.cz * CHUNK_SIZE_XZ + z;
+                            const belowId = getGlobalBlock(gx, y - 1, gz);
+
+                            if (belowId === 0) {
+                                updates.push({ x: gx, y: y - 1, z: gz });
+                                continue;
+                            }
+
+                            const neighbours = [
+                                { dx:  1, dz:  0 },
+                                { dx: -1, dz:  0 },
+                                { dx:  0, dz:  1 },
+                                { dx:  0, dz: -1 }
+                            ];
+
+                            for (const n of neighbours) {
+                                if (updates.length >= maxUpdates) break;
+                                const nx = gx + n.dx;
+                                const nz = gz + n.dz;
+                                const neighbourId = getGlobalBlock(nx, y, nz);
+                                if (neighbourId !== 0) continue;
+                                updates.push({ x: nx, y, z: nz });
+                            }
+                        }
+                    }
+                }
+            }
+
+            for (const update of updates) {
+                setGlobalBlock(update.x, update.y, update.z, 14, false);
             }
         }
 
@@ -1832,10 +2049,12 @@
                 const digitNum = parseInt(e.code.replace('Digit', ''));
                 if (digitNum >= 1 && digitNum <= 9) {
                     const slotIdx = digitNum - 1;
-                    const bId = hotbarAssigned[slotIdx];
-                    const qty = game.inventory[bId] || 0;
-                    if (qty > 0 || game_gamemodes[game.playerId] === 'creative') selectHotbarSlot(slotIdx);
-                    else showNotification("Du hast diesen Block noch nicht!");
+                    const slot = game.inventorySlots[slotIdx] || { blockId: 0, count: 0 };
+                    if (slot.count > 0 || game_gamemodes[game.playerId] === 'creative') {
+                        selectHotbarSlot(slotIdx);
+                    } else {
+                        showNotification("Du hast diesen Hotbar-Slot noch nicht belegt!");
+                    }
                 }
             }
 
@@ -1862,6 +2081,21 @@
             keys[e.code] = false;
         });
 
+        const resetInputState = () => {
+            Object.keys(keys).forEach(code => keys[code] = false);
+            controls.moveForward  = false;
+            controls.moveBackward = false;
+            controls.moveLeft     = false;
+            controls.moveRight    = false;
+            controls.jump         = false;
+            controls.flyDown      = false;
+        };
+
+        window.addEventListener('blur', resetInputState);
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) resetInputState();
+        });
+
         window.addEventListener('wheel', (e) => {
             if (!controls.isLocked) return;
             
@@ -1869,9 +2103,8 @@
             const dir = e.deltaY > 0 ? 1 : -1;
             for (let i = 0; i < 9; i++) {
                 nextSlot = (nextSlot + dir + 9) % 9;
-                const bId = hotbarAssigned[nextSlot];
-                const qty = game.inventory[bId] || 0;
-                if (qty > 0 || game_gamemodes[game.playerId] === 'creative') {
+                const slot = game.inventorySlots[nextSlot] || { blockId: 0, count: 0 };
+                if (slot.count > 0 || game_gamemodes[game.playerId] === 'creative') {
                     selectHotbarSlot(nextSlot);
                     break;
                 }
@@ -2233,8 +2466,15 @@
                     gltfLoader.load('./mobs/zombie.glb', (gltf) => {
                         this.group.remove(placeholder);
                         const model = gltf.scene;
-                        model.scale.set(0.9, 0.9, 0.9);
-                        model.position.y = -this.size[1] / 2; // Zentrieren
+                        // Auto-scale das Modell so, dass die Höhe zur `this.size[1]` passt
+                        const bbox = new THREE.Box3().setFromObject(model);
+                        const sizeVec = new THREE.Vector3();
+                        bbox.getSize(sizeVec);
+                        const targetHeight = this.size[1] || 1.8;
+                        const uniformScale = sizeVec.y > 0 ? (targetHeight / sizeVec.y) : 1.0;
+                        model.scale.setScalar(uniformScale * 0.98);
+                        // Zentriere Modell an den Boden (Gruppen-Position verwendet bereits die halbe Höhe)
+                        model.position.y = - (sizeVec.y * model.scale.y) / 2;
                         this.group.add(model);
 
                         this.mesh = model;
@@ -2242,29 +2482,73 @@
                             if (child.isMesh) child.userData.mob = this;
                         });
 
-                        if (gltf.animations.length > 0) {
+                        // Animationen: robusterer Umgang mit mehreren Clips
+                        if (gltf.animations && gltf.animations.length > 0) {
                             this.mixer = new THREE.AnimationMixer(model);
-                            this.mixer.clipAction(gltf.animations[0]).play();
+                            // Suche bevorzugt nach einem 'Walk' oder 'Run' Clip, ansonsten erstes Clip nutzen
+                            let walkClip = gltf.animations.find(a => /walk|run|idle/i.test(a.name)) || gltf.animations[0];
+                            try {
+                                const action = this.mixer.clipAction(walkClip);
+                                action.play();
+                                action.loop = THREE.LoopRepeat;
+                                this.animAction = action;
+                            } catch (e) {
+                                console.warn('Animation konnte nicht abgespielt werden', e);
+                            }
                         }
                     });
                 } else if (this.type === 'schwein') {
-                    // Body
-                    const bodyGeo = new THREE.BoxGeometry(0.8, 0.8, 1.2);
-                    const bodyMat = new THREE.MeshStandardMaterial({ color: colors.body });
-                    const body = new THREE.Mesh(bodyGeo, bodyMat);
-                    body.position.y = 0.4;
+                    const mainMat = new THREE.MeshStandardMaterial({ color: colors.body, roughness: 0.8, metalness: 0.05 });
+                    const headMat = new THREE.MeshStandardMaterial({ color: colors.head, roughness: 0.8, metalness: 0.05 });
+
+                    const body = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.6, 1.0), mainMat);
+                    body.position.y = 0.35;
                     this.group.add(body);
+
+                    const head = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.4, 0.4), headMat);
+                    head.position.set(0, 0.8, 0.45);
+                    this.group.add(head);
+
+                    const snout = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.15, 0.25), new THREE.MeshStandardMaterial({ color: 0xff99aa, roughness: 0.8, metalness: 0.05 }));
+                    snout.position.set(0, 0.7, 0.75);
+                    this.group.add(snout);
+
+                    const legGeo = new THREE.BoxGeometry(0.14, 0.3, 0.14);
+                    for (const offset of [[-0.25, -0.3], [0.25, -0.3], [-0.25, 0.3], [0.25, 0.3]]) {
+                        const leg = new THREE.Mesh(legGeo, new THREE.MeshStandardMaterial({ color: 0x7a3a56, roughness: 0.9 }));
+                        leg.position.set(offset[0], 0.15, offset[1]);
+                        this.group.add(leg);
+                    }
                     this.mesh = body;
                 } else if (this.type === 'kuh') {
-                    // Body
-                    const bodyGeo = new THREE.BoxGeometry(0.9, 0.9, 1.4);
-                    const bodyMat = new THREE.MeshStandardMaterial({ color: colors.body });
-                    const body = new THREE.Mesh(bodyGeo, bodyMat);
-                    body.position.y = 0.6;
+                    const mainMat = new THREE.MeshStandardMaterial({ color: colors.body, roughness: 0.8, metalness: 0.05 });
+                    const headMat = new THREE.MeshStandardMaterial({ color: colors.head, roughness: 0.8, metalness: 0.05 });
+
+                    const body = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.6, 1.2), mainMat);
+                    body.position.y = 0.4;
                     this.group.add(body);
+
+                    const head = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.4, 0.45), headMat);
+                    head.position.set(0, 0.85, 0.6);
+                    this.group.add(head);
+
+                    const horn = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.2), new THREE.MeshStandardMaterial({ color: 0xdddddd, roughness: 0.7 }));
+                    horn.rotation.z = Math.PI / 2;
+                    horn.position.set(-0.15, 0.98, 0.45);
+                    this.group.add(horn);
+                    const horn2 = horn.clone();
+                    horn2.position.set(0.15, 0.98, 0.45);
+                    this.group.add(horn2);
+
+                    const legGeo = new THREE.BoxGeometry(0.14, 0.35, 0.14);
+                    for (const offset of [[-0.25, -0.35], [0.25, -0.35], [-0.25, 0.35], [0.25, 0.35]]) {
+                        const leg = new THREE.Mesh(legGeo, new THREE.MeshStandardMaterial({ color: 0x331100, roughness: 0.9 }));
+                        leg.position.set(offset[0], 0.175, offset[1]);
+                        this.group.add(leg);
+                    }
                     this.mesh = body;
                 }
-                this.mesh.userData.mob = this; // Referenz zum Mob-Objekt
+                if (this.mesh) this.mesh.userData.mob = this; // Referenz zum Mob-Objekt
             }
 
             update() {
@@ -2273,14 +2557,19 @@
                 const isDay = sineAngle > 0.15;
                 const now = Date.now();
 
-                if (this.mixer) this.mixer.update(0.016); // Animationen updaten
+                if (this.mixer) {
+                    this.mixer.update(0.016); // Animationen updaten
+                    if (this.animAction) {
+                        this.animAction.timeScale = this.isWalking ? 1.2 : 0.6;
+                    }
+                }
 
                 // Zombie-Verhalten
                 if (this.type === 'zombie') {
                     // Tagsüber verbrennen
                     if (isDay) {
                         const headY = this.group.position.y + this.size[1] / 2;
-                        if (getGlobalBlock(this.group.position.x, headY + 0.5, this.group.position.z) === 0) { // Exposed to sky
+                        if (isExposedToSky(this.group.position.x, headY + 0.5, this.group.position.z)) {
                             if (Date.now() - this.lastBurnTime > 1000) {
                                 this.takeDamage(1);
                                 this.lastBurnTime = Date.now();
@@ -2509,13 +2798,25 @@
                     );
 
                     if (!playerBox.intersectsBox(blockBox)) {
-                        const activeBlockId      = hotbarAssigned[game.activeBlockIndex];
-                        const quantityAvailable  = game.inventory[activeBlockId] || 0;
+                        ensureSelectedHotbarSlotValid();
+                        const slot = game.inventorySlots[game.activeBlockIndex] || { blockId: 0, count: 0 };
+                        const blockId = slot.blockId;
+                        const quantityAvailable = slot.count;
 
-                        if (quantityAvailable > 0 || game.flyMode) {
-                            if (!game.flyMode) game.inventory[activeBlockId]--;
-                            setGlobalBlock(px, py, pz, activeBlockId);
-                            AudioEngine.playPlace();
+                        if ((quantityAvailable > 0 && blockId > 0) || game.flyMode) {
+                            if (!game.flyMode) {
+                                slot.count -= 1;
+                                if (slot.count <= 0) {
+                                    slot.blockId = 0;
+                                    slot.count = 0;
+                                }
+                            }
+                            if (blockId > 0) {
+                                setGlobalBlock(px, py, pz, blockId);
+                                AudioEngine.playPlace();
+                            } else {
+                                showNotification('Kein gültiger Block ausgewählt. Wähle einen anderen Slot.');
+                            }
                             drawHotbar();
                         } else {
                             showNotification(`Keine Blöcke in diesem Slot übrig!`);
@@ -2629,19 +2930,29 @@
             const sineAngle = Math.sin(angle);
             const orbitDist = 400;
 
-            let skyColor, intensity;
+            let skyColor = new THREE.Color(0x88c6ff);
+            // Tages-Interpolation: Tag > Dämmerung > Nacht
             if (sineAngle > 0.15) {
-                skyColor  = new THREE.Color(0xaaccff);
-                intensity = 0.95;
+                // Tag
+                const t = Math.min(1, (sineAngle - 0.15) / (1 - 0.15));
+                skyColor.lerpColors(new THREE.Color(0xffeebb), new THREE.Color(0x88c6ff), t);
                 updateStatTimeUI("Tag", "#ffd700");
+                // weniger Nebel tagsüber
+                scene.fog.density = 0.002 + (1 - t) * 0.002;
+                ambientLight.intensity = 0.45 + t * 0.5;
             } else if (sineAngle > -0.15) {
-                skyColor  = new THREE.Color(0xcca18a);
-                intensity = 0.45;
+                // Dämmerung
+                const t = Math.min(1, (sineAngle + 0.15) / (0.3));
+                skyColor = new THREE.Color(0xffb78a).lerp(new THREE.Color(0x6e89b8), t);
                 updateStatTimeUI("Dämmerung", "#ffa500");
+                scene.fog.density = 0.01;
+                ambientLight.intensity = 0.25 + t * 0.25;
             } else {
-                skyColor  = new THREE.Color(0x0a0f1d);
-                intensity = 0.15;
+                // Nacht
+                skyColor = new THREE.Color(0x061029);
                 updateStatTimeUI("Nacht", "#60a5fa");
+                scene.fog.density = 0.02;
+                ambientLight.intensity = 0.08;
             }
 
             scene.background = skyColor;
@@ -2678,8 +2989,27 @@
                 if (c.position.x > 300) c.position.x = -300;
             });
 
-            dirLight.intensity = intensity;
+            // Lichtstärke & -farbe für Sonne/Mond
+            if (sineAngle > 0.15) {
+                // Tag: warme Sonne
+                const sunStrength = 0.9 + (Math.sin(angle) * 0.1);
+                dirLight.intensity = sunStrength;
+                dirLight.color.setHex(0xfff1d0);
+                moonLight.intensity = 0.0;
+            } else if (sineAngle > -0.15) {
+                // Dämmerung: weiches, leicht orangenes Licht
+                dirLight.intensity = 0.45;
+                dirLight.color.setHex(0xffc28a);
+                moonLight.intensity = 0.02;
+            } else {
+                // Nacht: Mondlicht als primärer Richtungs-Lichtgeber (kühl)
+                dirLight.intensity = 0.08;
+                dirLight.color.setHex(0x6f8fb8);
+                moonLight.intensity = 0.12;
+                moonLight.color.setHex(0xa8c4ff);
+            }
             dirLight.position.set(sunX, sunY, 50);
+            moonLight.position.set(moonX, moonY, -50);
         }
 
         function checkUnderwater() {
@@ -2745,59 +3075,77 @@
         const hotbarEl   = document.getElementById('hotbar');
         const blockLabel = document.getElementById('block-label');
 
+        function getFirstAvailableHotbarSlot() {
+            for (let i = 0; i < 9; i++) {
+                const slot = game.inventorySlots[i];
+                if (!slot) continue;
+                if (slot.count > 0 || game_gamemodes[game.playerId] === 'creative') {
+                    return i;
+                }
+            }
+            return -1;
+        }
+
+        function ensureSelectedHotbarSlotValid() {
+            const activeSlot = game.inventorySlots[game.activeBlockIndex] || { blockId: 0, count: 0 };
+            if ((activeSlot.count > 0 || game_gamemodes[game.playerId] === 'creative') && activeSlot.blockId !== 0) return;
+
+            const firstAvailable = getFirstAvailableHotbarSlot();
+            if (firstAvailable >= 0) {
+                game.activeBlockIndex = firstAvailable;
+            }
+        }
+
         function drawHotbar() {
+            ensureSelectedHotbarSlotValid();
             hotbarEl.innerHTML = '';
-            hotbarAssigned.forEach((blockId, index) => {
-                const block = getBlockDef(blockId);
-                const qty   = game.inventory[blockId] || 0;
+            for (let index = 0; index < 9; index++) {
+                const slot = game.inventorySlots[index] || { blockId: 0, count: 0 };
+                const block = getBlockDef(slot.blockId);
+                const qty = slot.count;
                 const isCreative = game_gamemodes[game.playerId] === 'creative';
                 const hasItem = qty > 0 || isCreative;
 
-                const slot  = document.createElement('div');
-                
-                slot.className = `w-12 h-12 flex items-center justify-center cursor-pointer transition-all duration-75 relative mc-slot ${
+                const slotEl  = document.createElement('div');
+                slotEl.className = `w-12 h-12 flex items-center justify-center cursor-pointer transition-all duration-75 relative mc-slot ${
                     index === game.activeBlockIndex ? 'mc-slot-active' : ''
                 }`;
 
                 if (block && hasItem) {
-                    slot.style.backgroundColor = 'transparent';
-                    slot.style.backgroundImage = `url("./textures/${block.textureName}.png"), radial-gradient(circle, rgba(255,255,255,0.2) 20%, transparent 60%)`;
-                    slot.style.backgroundSize = "cover, cover";
-                    slot.title = block.name;
-                    
-                    slot.innerHTML = `
+                    slotEl.style.backgroundColor = 'transparent';
+                    slotEl.style.backgroundImage = `url("./textures/${block.textureName}.png"), radial-gradient(circle, rgba(255,255,255,0.2) 20%, transparent 60%)`;
+                    slotEl.style.backgroundSize = "cover, cover";
+                    slotEl.title = block.name;
+                    slotEl.innerHTML = `
                         <span class="text-xs font-bold drop-shadow-[1px_1px_0px_#000] text-yellow-400 absolute top-0.5 left-1">${index + 1}</span>
                         <span class="text-[11px] font-bold drop-shadow-[1.5px_1.5px_0px_#000] text-white absolute bottom-0.5 right-1">x${qty}</span>
                     `;
                 } else {
-                    slot.style.backgroundColor = 'rgba(0,0,0,0.5)';
-                    slot.style.backgroundImage = 'none';
-                    slot.innerHTML = `<span class="text-xs font-bold text-neutral-600 absolute top-0.5 left-1">${index + 1}</span>`;
+                    slotEl.style.backgroundColor = 'rgba(0,0,0,0.5)';
+                    slotEl.style.backgroundImage = 'none';
+                    slotEl.innerHTML = `<span class="text-xs font-bold text-neutral-600 absolute top-0.5 left-1">${index + 1}</span>`;
                 }
 
-                slot.addEventListener('click', () => {
-                    if (hasItem) selectHotbarSlot(index);
+                slotEl.addEventListener('click', () => {
+                    if (hasItem || isCreative) selectHotbarSlot(index);
                 });
 
-                hotbarEl.appendChild(slot);
-            });
+                hotbarEl.appendChild(slotEl);
+            }
 
-            const activeBlockId = hotbarAssigned[game.activeBlockIndex];
-            const currentQty    = game.inventory[activeBlockId] || 0;
-            // Variable umbenannt um "Cannot redeclare" Fehler zu vermeiden
-            const activeBlockRef = (currentQty > 0 || game_gamemodes[game.playerId] === 'creative') ? getBlockDef(activeBlockId) : null;
+            const activeSlot = game.inventorySlots[game.activeBlockIndex] || { blockId: 0, count: 0 };
+            const activeBlockRef = (activeSlot.count > 0 || game_gamemodes[game.playerId] === 'creative') ? getBlockDef(activeSlot.blockId) : null;
             blockLabel.innerText = activeBlockRef ? activeBlockRef.name : "";
         }
 
         function selectHotbarSlot(index) {
-            const bId = hotbarAssigned[index];
-            const qty = game.inventory[bId] || 0;
+            const slot = game.inventorySlots[index] || { blockId: 0, count: 0 };
+            const qty = slot.count;
             const isCreative = game_gamemodes[game.playerId] === 'creative';
-            
             if (qty === 0 && !isCreative) return;
 
             game.activeBlockIndex = index;
-            const selectedBlockRef = getBlockDef(bId);
+            const selectedBlockRef = getBlockDef(slot.blockId);
             if (selectedBlockRef) {
                 armMesh.material = getBlockMaterials(selectedBlockRef)[2];
             }
@@ -2806,9 +3154,11 @@
 
         // --- INVENTAR & CRAFTING ---
         const inventoryGrid          = document.getElementById('inventory-grid');
-        const inventoryHotbarAssigner= document.getElementById('inventory-hotbar-assigner');
-        const selectedQtyText        = document.getElementById('selected-qty-text');
-        const btnGainBlocks          = document.getElementById('btn-gain-blocks');
+        const inventoryHotbarRow      = document.getElementById('inventory-hotbar-row');
+        const selectedSlotInfo        = document.getElementById('selected-slot-info');
+        const btnAssignHotbar         = document.getElementById('btn-assign-hotbar');
+        const btnAutoHotbar           = document.getElementById('btn-auto-hotbar');
+        const btnClearSelection       = document.getElementById('btn-clear-selection');
         const craftingList           = document.getElementById('crafting-list');
 
         const CRAFTING_RECIPES = [
@@ -2816,37 +3166,134 @@
             { resultId: 17, count: 1, name: "Werkbank",  ingredients: [{ id: 7, count: 4 }] }
         ];
 
-        function buildInventoryUI() {
-            inventoryGrid.innerHTML = '';
-            BLOCKS.forEach(block => {
-                const item = document.createElement('div');
-                item.className = `w-12 h-12 flex items-center justify-center cursor-pointer border-4 border-neutral-700 hover:border-white transition-colors duration-100 relative ${
-                    block.id === game.selectedInventoryBlockId ? 'border-yellow-400 scale-105' : ''
-                }`;
-                item.style.backgroundColor = block.color;
-                item.style.backgroundImage = `radial-gradient(circle, rgba(255,255,255,0.2) 10%, transparent 50%)`;
-                item.title = block.name;
+        function getScratchSlotLabel(slot) {
+            if (!slot || slot.blockId === 0) return 'Leer';
+            const block = getBlockDef(slot.blockId);
+            return `${block ? block.name : 'Unbekannt'} x${slot.count}`;
+        }
 
-                const qty = game.inventory[block.id] || 0;
-                item.innerHTML = `
-                    <span class="text-[10px] font-bold drop-shadow-[1.5px_1.5px_0px_#000] text-white absolute bottom-0.5 right-1">x${qty}</span>
-                `;
+        function updateSelectedSlotInfo() {
+            const slot = game.selectedInventorySlot !== null ? game.inventorySlots[game.selectedInventorySlot] : null;
+            const hotbarSelection = game.selectedHotbarSlotIndex !== null ? `, Hotbar-Slot: ${game.selectedHotbarSlotIndex + 1}` : '';
 
-                item.addEventListener('click', () => {
-                    game.selectedInventoryBlockId = block.id;
-                    buildInventoryUI();
-                });
-                inventoryGrid.appendChild(item);
-            });
+            if (slot && slot.blockId !== 0) {
+                selectedSlotInfo.innerText = `Slot ${game.selectedInventorySlot + 1}${hotbarSelection}: ${getScratchSlotLabel(slot)}`;
+            } else if (game.selectedInventorySlot !== null) {
+                selectedSlotInfo.innerText = `Slot ${game.selectedInventorySlot + 1}${hotbarSelection}: Leer`;
+            } else if (game.selectedHotbarSlotIndex !== null) {
+                selectedSlotInfo.innerText = `Hotbar-Slot ${game.selectedHotbarSlotIndex + 1}${hotbarSelection}: ${getScratchSlotLabel(game.inventorySlots[game.selectedHotbarSlotIndex])}`;
+            } else {
+                selectedSlotInfo.innerText = 'Wähle einen Inventar- oder Hotbar-Slot aus.';
+            }
+        }
 
-            const selectedBlock = BLOCKS.find(b => b.id === game.selectedInventoryBlockId);
-            selectedQtyText.innerText = selectedBlock ? `${selectedBlock.name} (x${game.inventory[selectedBlock.id] || 0})` : '-';
+        function selectInventorySlot(index) {
+            game.selectedInventorySlot = index;
+            game.selectedHotbarSlotIndex = null;
+            buildInventoryUI();
+        }
 
+        function selectHotbarSlotInInventory(index) {
+            game.selectedHotbarSlotIndex = index;
+            game.selectedInventorySlot = null;
+            buildInventoryUI();
+        }
+
+        function addItemToInventory(blockId, amount = 1) {
+            let remaining = amount;
+
+            for (const slot of game.inventorySlots) {
+                if (remaining <= 0) break;
+                if (slot.blockId === blockId && slot.count < 64) {
+                    const availableSpace = 64 - slot.count;
+                    const addAmount = Math.min(availableSpace, remaining);
+                    slot.count += addAmount;
+                    remaining -= addAmount;
+                }
+            }
+
+            for (const slot of game.inventorySlots) {
+                if (remaining <= 0) break;
+                if (slot.blockId === 0) {
+                    slot.blockId = blockId;
+                    const addAmount = Math.min(64, remaining);
+                    slot.count = addAmount;
+                    remaining -= addAmount;
+                }
+            }
+
+            buildInventoryUI();
+            drawHotbar();
+            return remaining;
+        }
+
+        function removeItemsFromInventory(blockId, amount) {
+            let remaining = amount;
+            for (const slot of game.inventorySlots) {
+                if (remaining <= 0) break;
+                if (slot.blockId === blockId) {
+                    const removeAmount = Math.min(slot.count, remaining);
+                    slot.count -= removeAmount;
+                    remaining -= removeAmount;
+                    if (slot.count === 0) slot.blockId = 0;
+                }
+            }
+            buildInventoryUI();
+            drawHotbar();
+            return amount - remaining;
+        }
+
+        function moveSlotContent(sourceIndex, targetIndex) {
+            if (sourceIndex === targetIndex) return;
+            const source = game.inventorySlots[sourceIndex];
+            const target = game.inventorySlots[targetIndex];
+            if (!source || source.blockId === 0) return;
+
+            if (target.blockId === 0) {
+                target.blockId = source.blockId;
+                target.count = source.count;
+                source.blockId = 0;
+                source.count = 0;
+            } else if (target.blockId === source.blockId) {
+                const space = 64 - target.count;
+                const transfer = Math.min(space, source.count);
+                target.count += transfer;
+                source.count -= transfer;
+                if (source.count === 0) source.blockId = 0;
+            } else {
+                const temp = { blockId: target.blockId, count: target.count };
+                target.blockId = source.blockId;
+                target.count = source.count;
+                source.blockId = temp.blockId;
+                source.count = temp.count;
+            }
+            buildInventoryUI();
+            drawHotbar();
+        }
+
+        function autoFillHotbar() {
+            for (let i = 0; i < 9; i++) {
+                const hotbarSlot = game.inventorySlots[i];
+                if (hotbarSlot.blockId === 0) {
+                    const sourceIndex = game.inventorySlots.findIndex((s, idx) => idx >= 9 && s.blockId !== 0);
+                    if (sourceIndex >= 0) {
+                        moveSlotContent(sourceIndex, i);
+                    }
+                } else if (hotbarSlot.count < 64) {
+                    const sourceIndex = game.inventorySlots.findIndex((s, idx) => idx >= 9 && s.blockId === hotbarSlot.blockId && s.count > 0);
+                    if (sourceIndex >= 0) {
+                        moveSlotContent(sourceIndex, i);
+                    }
+                }
+            }
+        }
+
+        function buildCraftingUI() {
             craftingList.innerHTML = '';
             CRAFTING_RECIPES.forEach(recipe => {
                 const row = document.createElement('div');
-                row.className = "flex justify-between items-center bg-neutral-900/60 p-1.5 rounded border border-neutral-700 hover:border-green-500 cursor-pointer transition-all";
-                
+                row.className = "flex justify-between items-center bg-neutral-900/60 p-2 rounded border border-neutral-700 hover:border-green-500 cursor-pointer transition-all text-xs";
+
                 const ingNames = recipe.ingredients.map(ing => {
                     const blockDef = getBlockDef(ing.id);
                     return `${ing.count}x ${blockDef ? blockDef.name : "?"}`;
@@ -2854,68 +3301,98 @@
 
                 row.innerHTML = `
                     <div>
-                        <div class="font-bold text-white text-xs">${recipe.name} (x${recipe.count})</div>
-                        <div class="text-[10px] text-gray-400">Bedarf: ${ingNames}</div>
+                        <div class="font-bold text-white">${recipe.name} (x${recipe.count})</div>
+                        <div class="text-gray-400">Bedarf: ${ingNames}</div>
                     </div>
                 `;
 
                 row.addEventListener('click', () => {
-                    let hasIngredients = true;
+                    let canCraft = true;
                     recipe.ingredients.forEach(ing => {
-                        if ((game.inventory[ing.id] || 0) < ing.count) hasIngredients = false;
+                        const total = game.inventorySlots.reduce((sum, slot) => sum + ((slot.blockId === ing.id) ? slot.count : 0), 0);
+                        if (total < ing.count) canCraft = false;
                     });
 
-                    if (hasIngredients) {
-                        recipe.ingredients.forEach(ing => {
-                            game.inventory[ing.id] -= ing.count;
-                        });
-                        game.inventory[recipe.resultId] = (game.inventory[recipe.resultId] || 0) + recipe.count;
-                        AudioEngine.playPlace();
-                        buildInventoryUI();
-                        drawHotbar();
-                    } else {
+                    if (!canCraft) {
                         showNotification("Nicht genügend Materialien!");
+                        return;
                     }
+
+                    recipe.ingredients.forEach(ing => removeItemsFromInventory(ing.id, ing.count));
+                    addItemToInventory(recipe.resultId, recipe.count);
+                    AudioEngine.playPlace();
                 });
 
                 craftingList.appendChild(row);
             });
-
-            inventoryHotbarAssigner.innerHTML = '';
-            for (let i = 0; i < 9; i++) {
-                const currentAssignedId = hotbarAssigned[i];
-                const blockDef          = getBlockDef(currentAssignedId);
-
-                const slotAssignBtn = document.createElement('button');
-                slotAssignBtn.className = "w-10 h-10 mc-button text-xs flex flex-col justify-center items-center font-bold";
-                slotAssignBtn.style.backgroundColor = blockDef ? blockDef.color : '#333';
-                slotAssignBtn.innerHTML = `<span class="text-[9px] text-white">S${i+1}</span>`;
-
-                slotAssignBtn.addEventListener('click', () => {
-                    hotbarAssigned[i] = game.selectedInventoryBlockId;
-                    AudioEngine.playPlace();
-                    buildInventoryUI();
-                    drawHotbar();
-                    selectHotbarSlot(game.activeBlockIndex);
-                });
-
-                inventoryHotbarAssigner.appendChild(slotAssignBtn);
-            }
         }
 
-        btnGainBlocks.addEventListener('click', () => {
-            const isCreative = game_gamemodes[game.playerId] === 'creative';
-            if (!isCreative) {
-                showNotification("Nur im Creative-Modus verfügbar!");
+        function buildInventoryUI() {
+            inventoryHotbarRow.innerHTML = '';
+            for (let i = 0; i < 9; i++) {
+                const slot = game.inventorySlots[i];
+                const block = getBlockDef(slot.blockId);
+                const selected = game.selectedHotbarSlotIndex === i;
+                const selectedInventory = game.selectedInventorySlot === i;
+
+                const slotEl = document.createElement('div');
+                slotEl.className = `w-12 h-12 flex items-center justify-center rounded-sm border ${selected || selectedInventory ? 'border-yellow-400' : 'border-neutral-700'} bg-neutral-950 cursor-pointer relative ${slot.blockId !== 0 ? 'hover:border-white' : ''}`;
+                if (block && slot.blockId !== 0) {
+                    slotEl.style.backgroundImage = `url("./textures/${block.textureName}.png"), radial-gradient(circle, rgba(255,255,255,0.15) 20%, transparent 60%)`;
+                    slotEl.style.backgroundSize = 'cover, cover';
+                    slotEl.title = `${block.name} x${slot.count}`;
+                    slotEl.innerHTML = `<span class="text-[10px] font-bold text-white absolute bottom-0.5 right-1 drop-shadow-[1px_1px_0px_#000]">${slot.count}</span>`;
+                } else {
+                    slotEl.style.backgroundColor = 'rgba(255,255,255,0.04)';
+                    slotEl.innerHTML = `<span class="text-[9px] text-neutral-500 absolute top-0.5 left-0.5">${i + 1}</span>`;
+                }
+
+                slotEl.addEventListener('click', () => selectHotbarSlotInInventory(i));
+                inventoryHotbarRow.appendChild(slotEl);
+            }
+
+            inventoryGrid.innerHTML = '';
+            for (let i = 9; i < game.inventorySlots.length; i++) {
+                const slot = game.inventorySlots[i];
+                const block = getBlockDef(slot.blockId);
+                const selected = game.selectedInventorySlot === i;
+
+                const item = document.createElement('div');
+                item.className = `w-12 h-12 flex items-center justify-center rounded-sm border ${selected ? 'border-yellow-400' : 'border-neutral-700'} bg-neutral-950 cursor-pointer relative ${slot.blockId !== 0 ? 'hover:border-white' : ''}`;
+                if (block && slot.blockId !== 0) {
+                    item.style.backgroundImage = `url("./textures/${block.textureName}.png"), radial-gradient(circle, rgba(255,255,255,0.15) 20%, transparent 60%)`;
+                    item.style.backgroundSize = 'cover, cover';
+                    item.title = `${block.name} x${slot.count}`;
+                    item.innerHTML = `<span class="text-[10px] font-bold text-white absolute bottom-0.5 right-1 drop-shadow-[1px_1px_0px_#000]">${slot.count}</span>`;
+                } else {
+                    item.style.backgroundColor = 'rgba(255,255,255,0.04)';
+                }
+
+                item.addEventListener('click', () => selectInventorySlot(i));
+                inventoryGrid.appendChild(item);
+            }
+
+            updateSelectedSlotInfo();
+            buildCraftingUI();
+        }
+
+        btnAssignHotbar.addEventListener('click', () => {
+            if (game.selectedInventorySlot === null || game.selectedHotbarSlotIndex === null) {
+                showNotification('Wähle zuerst einen Inventar- und einen Hotbar-Slot aus.');
                 return;
             }
-            const bId = game.selectedInventoryBlockId;
-            if (bId) {
-                game.inventory[bId] = (game.inventory[bId] || 0) + 64;
-                AudioEngine.playPlace();
-                buildInventoryUI();
-                drawHotbar();
-            }
+            moveSlotContent(game.selectedInventorySlot, game.selectedHotbarSlotIndex);
+        });
+
+        btnAutoHotbar.addEventListener('click', () => {
+            autoFillHotbar();
+        });
+
+        btnClearSelection.addEventListener('click', () => {
+            game.selectedInventorySlot = null;
+            game.selectedHotbarSlotIndex = null;
+            updateSelectedSlotInfo();
+            buildInventoryUI();
         });
 
         function openInventory() {
@@ -3179,11 +3656,10 @@
                 // Distanz-Check zum Einsammeln (1.5 Blöcke Radius)
                 const dist = camera.position.distanceTo(item.mesh.position);
                 if (dist < 1.5 && now - item.spawnTime > 600) {
-                    game.inventory[item.blockId] = (game.inventory[item.blockId] || 0) + 1;
+                    addItemToInventory(item.blockId, 1);
                     scene.remove(item.mesh);
                     game.droppedItems.splice(i, 1);
                     AudioEngine.playPlace(); // Pickup Sound
-                    drawHotbar();
                 }
             }
         }
@@ -3216,6 +3692,10 @@
                     game.activeMobs.forEach(m => m.update());
                 }
 
+                if (chunkUpdateTick % 8 === 0) {
+                    updateWaterPhysics();
+                }
+
                 // Mob Spawning Logik (wiederhergestellt)
                 if (Math.random() < 0.002 && game.activeMobs.length < 20) {
                     const spawnX = camera.position.x + (Math.random() - 0.5) * 64;
@@ -3226,9 +3706,10 @@
                     const sAngle = Math.sin(game.timeOfDay * Math.PI * 2);
                     const isNightTime = sAngle < -0.15;
                     const surfaceY = game.noiseGen.getHeight(spawnX, spawnZ);
-                    const isInsideCave = getGlobalBlock(Math.floor(spawnX), Math.floor(surfaceY) + 1, Math.floor(spawnZ)) !== 0;
+                    const exposed = isExposedToSky(spawnX, surfaceY + 1, spawnZ);
+                    const isInsideCave = !exposed;
 
-                    // Zombies spawnen nur nachts oder in Höhlen
+                    // Zombies spawnen nur nachts oder in dunklen Höhlen
                     if (selectedType === 'zombie' && !isNightTime && !isInsideCave) {
                         selectedType = mobTypes[Math.floor(Math.random() * (mobTypes.length - 1)) + 1];
                     }
