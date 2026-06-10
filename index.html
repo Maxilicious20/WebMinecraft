@@ -1789,7 +1789,6 @@
                         y: camera.position.y - 1,
                         z: camera.position.z,
                         yaw: controls.yaw,
-                        client_version: CLIENT_VERSION,
                         updated_at: new Date().toISOString()
                     });
                     if (upsertError) console.warn('Fehler beim Upsert des lokalen Spielers:', upsertError);
@@ -1910,7 +1909,6 @@
                         y: camera.position.y - 1, // Leicht versetzt für Füße
                         z: camera.position.z,
                         yaw: controls.yaw,
-                        client_version: CLIENT_VERSION,
                         updated_at: new Date().toISOString()
                     })
                     .then(({ data, error }) => {
