@@ -669,7 +669,7 @@
             return dbInstance;
         }
 
-        initSupabase().catch(err => console.warn("Supabase-Initialisierung fehlgeschlagen:", err));
+        const supabaseInitPromise = initSupabase().catch(err => console.warn("Supabase-Initialisierung fehlgeschlagen:", err));
 
         // --- OPTIMIERTE CHUNK CONFIG ---
         const CHUNK_SIZE_XZ = 16;
@@ -712,6 +712,8 @@
             enableMultiplayer: false,
             worldMode: 'Standard',
             difficulty: 'Normal',
+            devSeedType: null,
+            isDevSeed: false,
             playerId: "player_" + Math.random().toString(36).substring(2, 9),
             loadedMods: [],
             players: {}, 
@@ -1101,9 +1103,49 @@
                 this.noiseGen = new SeededNoise(seed);
                 this.detailNoise = new SeededNoise(seed + "_detail");
                 this.caveNoise = new SeededNoise(seed + "_caves");
+                this.devSeedTag = String(seed || "").trim().toLowerCase();
+                this.devSeedType = ['dev1', 'dev2', 'dev3'].includes(this.devSeedTag) ? this.devSeedTag : null;
+                this.isDevSeed = !!this.devSeedType;
             }
 
             getBiome(x, z) {
+                if (this.isDevSeed) {
+                    let height;
+                    if (this.devSeedType === 'dev1') {
+                        height = this.getHeightDev1(x, z);
+                    } else if (this.devSeedType === 'dev2') {
+                        height = this.getHeightDev2(x, z);
+                    } else {
+                        height = this.getHeightDev3(x, z);
+                    }
+
+                    if (height <= 0) {
+                        return { name: "Ocean", heightOffset: 0, scale: 1, topBlock: 14, subBlock: 14, treeChance: 0 };
+                    }
+                    if (this.devSeedType === 'dev2') {
+                        if (height < 6) {
+                            return { name: "GlitchShore", heightOffset: 2, scale: 3, topBlock: 9, subBlock: 14, treeChance: 0.01 };
+                        }
+                        return { name: "Skyplateau", heightOffset: 10, scale: 8, topBlock: 7, subBlock: 3, treeChance: 0.04 };
+                    }
+                    if (this.devSeedType === 'dev3') {
+                        if (height < 2) {
+                            return { name: "Abyss", heightOffset: 0, scale: 1, topBlock: 14, subBlock: 14, treeChance: 0 };
+                        }
+                        if (height < 8) {
+                            return { name: "Reef", heightOffset: 2, scale: 5, topBlock: 8, subBlock: 14, treeChance: 0 };
+                        }
+                        return { name: "CrystalSpire", heightOffset: 12, scale: 12, topBlock: 9, subBlock: 7, treeChance: 0.03 };
+                    }
+                    if (height < 4) {
+                        return { name: "Beach", heightOffset: 2, scale: 4, topBlock: 10, subBlock: 10, treeChance: 0.02 };
+                    }
+                    if (height < 10) {
+                        return { name: "Coast", heightOffset: 6, scale: 6, topBlock: 1, subBlock: 2, treeChance: 0.08 };
+                    }
+                    return { name: "Island", heightOffset: 10, scale: 8, topBlock: 1, subBlock: 3, treeChance: 0.18 };
+                }
+
                 // Temperatur und Feuchtigkeit bestimmen das Biom
                 const heat     = this.noiseGen.fbm(x * 0.004, z * 0.004, 2);
                 const moisture = this.noiseGen.fbm(x * 0.004 + 500, z * 0.004 + 500, 2);
@@ -1123,7 +1165,45 @@
                 }
             }
 
+            getHeightDev1(gx, gz) {
+                const dist = Math.sqrt(gx * gx + gz * gz);
+                const longRidged = this.noiseGen.fbm(gx * 0.009, gz * 0.0018, 4) * 20;
+                const narrowRidges = this.noiseGen.fbm(gx * 0.003, gz * 0.012, 4) * 22;
+                const detail = this.detailNoise.fbm(gx * 0.025, gz * 0.025, 2) * 4;
+                const coastalBand = this.noiseGen.fbm(gx * 0.02, gz * 0.02, 3) * 2;
+                let height = longRidged + narrowRidges + detail + coastalBand - 10;
+
+                if (dist < 40) {
+                    height = Math.max(height, 8 + this.detailNoise.fbm(gx * 0.08, gz * 0.08, 2) * 7);
+                }
+                if (dist < 12) {
+                    height = Math.max(height, 12 + this.detailNoise.fbm(gx * 0.06, gz * 0.06, 2) * 6);
+                }
+                return Math.floor(Math.max(0, height));
+            }
+
+            getHeightDev2(gx, gz) {
+                const ring = Math.sin(Math.sqrt(gx * gx + gz * gz) * 0.18) * 4;
+                const skyField = this.noiseGen.fbm(gx * 0.01, gz * 0.01, 3) * 8;
+                const floating = this.detailNoise.fbm(gx * 0.03, gz * 0.03, 2) * 12;
+                const height = Math.round(ring + skyField + floating - 4);
+                return Math.max(0, height);
+            }
+
+            getHeightDev3(gx, gz) {
+                const rings = Math.cos(Math.sqrt(gx * gx + gz * gz) * 0.12) * 6;
+                const reef = this.noiseGen.fbm(gx * 0.008, gz * 0.008, 4) * 16;
+                const spike = this.detailNoise.fbm(gx * 0.05, gz * 0.05, 2) * 10;
+                const height = Math.floor(Math.max(-2, reef + spike + rings - 6));
+                return height;
+            }
+
             getHeight(gx, gz) {
+                if (this.isDevSeed) {
+                    if (this.devSeedType === 'dev1') return this.getHeightDev1(gx, gz);
+                    if (this.devSeedType === 'dev2') return this.getHeightDev2(gx, gz);
+                    return this.getHeightDev3(gx, gz);
+                }
                 const b       = this.getBiome(gx, gz);
                 const baseVal = this.noiseGen.fbm(gx * 0.01, gz * 0.01, 4);
                 const detail  = this.detailNoise.fbm(gx * 0.05, gz * 0.05, 2) * 2;
@@ -1226,15 +1306,39 @@
 
                         const seedValue = game.noiseGen.noiseGen.random2D(gx, gz);
                         if (x === 8 && z === 8) {
-                            if (b.name === "Forest" && seedValue > 0.35) {
-                                this.buildTree(x, finalHeight, z, 5, 6);
-                            } else if (b.name === "Plains" && seedValue > 0.92) {
-                                this.buildTree(x, finalHeight, z, 5, 6);
-                            } else if (b.name === "Desert" && seedValue > 0.72) {
-                                this.buildCactus(x, finalHeight, z);
+                                    if (game.noiseGen.isDevSeed) {
+                            if (game.noiseGen.devSeedType === 'dev1') {
+                                if (seedValue > 0.78 && finalHeight <= 2) {
+                                    this.buildShipwreck(x, finalHeight, z);
+                                } else if (seedValue > 0.58 && finalHeight > 0) {
+                                    this.buildModernHouse(x, finalHeight, z);
+                                }
+                            } else if (game.noiseGen.devSeedType === 'dev2') {
+                                if (seedValue > 0.65) {
+                                    this.buildNeonObelisk(x, finalHeight + 1, z);
+                                } else if (finalHeight > 2) {
+                                    this.buildFloatingPlatform(x, finalHeight, z);
+                                }
+                            } else if (game.noiseGen.devSeedType === 'dev3') {
+                                if (seedValue > 0.6 && finalHeight > 3) {
+                                    this.buildCrystalDome(x, finalHeight, z);
+                                }
+                            }
+                        } else {
+                                if (b.name === "Forest" && seedValue > 0.35) {
+                                    this.buildTree(x, finalHeight, z, 5, 6);
+                                } else if (b.name === "Plains" && seedValue > 0.92) {
+                                    this.buildTree(x, finalHeight, z, 5, 6);
+                                } else if (b.name === "Desert" && seedValue > 0.72) {
+                                    this.buildCactus(x, finalHeight, z);
+                                }
                             }
                         }
                     }
+                }
+
+                if (game.noiseGen.isDevSeed && this.cx === 0 && this.cz === 0) {
+                    this.ensureDevCenter();
                 }
 
                 Object.keys(game.modifiedBlocks).forEach(key => {
@@ -1285,6 +1389,180 @@
                         this.blocks[this.getIndex(tx, yPos, tz)] = 11;
                     }
                 }
+            }
+
+            setLocalBlock(tx, ty, tz, blockId) {
+                if (tx < 0 || tx >= CHUNK_SIZE_XZ || tz < 0 || tz >= CHUNK_SIZE_XZ || ty < 0 || ty >= CHUNK_HEIGHT) return;
+                this.blocks[this.getIndex(tx, ty, tz)] = blockId;
+            }
+
+            buildModernHouse(tx, ty, tz) {
+                const baseY = ty + 1;
+                for (let dx = -2; dx <= 2; dx++) {
+                    for (let dz = -2; dz <= 2; dz++) {
+                        this.setLocalBlock(tx + dx, baseY - 1, tz + dz, 3);
+                        this.setLocalBlock(tx + dx, baseY, tz + dz, 7);
+                    }
+                }
+                for (let dx = -2; dx <= 2; dx++) {
+                    for (let dz = -2; dz <= 2; dz++) {
+                        if (Math.abs(dx) === 2 || Math.abs(dz) === 2) {
+                            const height = baseY + 1 + ((Math.abs(dx) === 2 && Math.abs(dz) === 2) ? 1 : 0);
+                            const blockId = (Math.abs(dx) === 2 && Math.abs(dz) === 2) ? 5 : 9;
+                            this.setLocalBlock(tx + dx, height, tz + dz, blockId);
+                        }
+                    }
+                }
+                for (let dx = -1; dx <= 1; dx++) {
+                    for (let dz = -1; dz <= 1; dz++) {
+                        this.setLocalBlock(tx + dx, baseY + 3, tz + dz, 7);
+                    }
+                }
+                this.setLocalBlock(tx, baseY + 1, tz - 2, 0);
+                this.setLocalBlock(tx, baseY + 1, tz + 2, 0);
+                this.setLocalBlock(tx - 2, baseY + 1, tz, 0);
+                this.setLocalBlock(tx + 2, baseY + 1, tz, 0);
+                for (let dx = -3; dx <= 3; dx++) {
+                    this.setLocalBlock(tx + dx, baseY - 1, tz + 3, 10);
+                    this.setLocalBlock(tx + dx, baseY - 1, tz - 3, 10);
+                }
+            }
+
+            buildShipwreck(tx, ty, tz) {
+                const baseY = SEA_LEVEL - 2;
+                for (let dx = -3; dx <= 3; dx++) {
+                    for (let dz = 0; dz <= 4; dz++) {
+                        const height = baseY + (dz === 4 ? 2 : 0);
+                        if (Math.abs(dx) + dz < 6) {
+                            this.setLocalBlock(tx + dx, height, tz + dz, 7);
+                        }
+                        if (dz === 0 && Math.abs(dx) < 3) {
+                            this.setLocalBlock(tx + dx, baseY - 1, tz + dz, 3);
+                        }
+                    }
+                }
+                this.setLocalBlock(tx, baseY + 1, tz + 2, 9);
+                this.setLocalBlock(tx - 2, baseY, tz + 1, 9);
+                this.setLocalBlock(tx + 2, baseY, tz + 1, 9);
+            }
+
+            buildNeonObelisk(tx, ty, tz) {
+                for (let h = 0; h < 10; h++) {
+                    this.setLocalBlock(tx, ty + h, tz, 9);
+                }
+                for (let offset = -1; offset <= 1; offset++) {
+                    this.setLocalBlock(tx + offset, ty - 1, tz, 8);
+                    this.setLocalBlock(tx, ty - 1, tz + offset, 8);
+                }
+            }
+
+            buildFloatingPlatform(tx, ty, tz) {
+                for (let dx = -3; dx <= 3; dx++) {
+                    for (let dz = -3; dz <= 3; dz++) {
+                        const height = ty + ((Math.abs(dx) + Math.abs(dz) > 4) ? 0 : 1);
+                        this.setLocalBlock(tx + dx, height, tz + dz, 7);
+                        if (Math.abs(dx) === 3 || Math.abs(dz) === 3) {
+                            this.setLocalBlock(tx + dx, height - 1, tz + dz, 9);
+                        }
+                    }
+                }
+                for (let h = 1; h <= 4; h++) {
+                    this.setLocalBlock(tx, ty + h, tz, 9);
+                }
+            }
+
+            buildCrystalDome(tx, ty, tz) {
+                for (let dx = -2; dx <= 2; dx++) {
+                    for (let dz = -2; dz <= 2; dz++) {
+                        for (let dy = 0; dy <= 2; dy++) {
+                            const dist = Math.sqrt(dx*dx + dz*dz + dy*dy);
+                            if (dist < 3.1) {
+                                this.setLocalBlock(tx + dx, ty + dy, tz + dz, 9);
+                            }
+                        }
+                    }
+                }
+                this.setLocalBlock(tx, ty + 1, tz, 8);
+                this.setLocalBlock(tx, ty + 3, tz, 1);
+            }
+
+            ensureDevCenter() {
+                if (game.noiseGen.devSeedType === 'dev1') {
+                    const centerX = 8;
+                    const centerZ = 8;
+                    const islandHeight = Math.max(10, game.noiseGen.getHeight(0, 0));
+                    for (let dx = -5; dx <= 5; dx++) {
+                        for (let dz = -5; dz <= 5; dz++) {
+                            const dist = Math.sqrt(dx * dx + dz * dz);
+                            const height = islandHeight - Math.floor(dist * 1.2);
+                            if (height > 0) {
+                                const gx = centerX + dx;
+                                const gz = centerZ + dz;
+                                if (gx >= 0 && gx < CHUNK_SIZE_XZ && gz >= 0 && gz < CHUNK_SIZE_XZ) {
+                                    for (let y = 0; y <= height; y++) {
+                                        const blockId = y === height ? (height <= 3 ? 10 : 1) : (y > height - 3 ? 2 : 3);
+                                        this.setLocalBlock(gx, y, gz, blockId);
+                                    }
+                                    for (let y = height + 1; y <= SEA_LEVEL; y++) {
+                                        this.setLocalBlock(gx, y, gz, 14);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    this.buildModernHouse(centerX, islandHeight + 1, centerZ);
+                } else if (game.noiseGen.devSeedType === 'dev2') {
+                    const centerX = 8;
+                    const centerZ = 8;
+                    const platformY = Math.max(12, game.noiseGen.getHeight(0, 0) + 4);
+                    for (let dx = -6; dx <= 6; dx++) {
+                        for (let dz = -6; dz <= 6; dz++) {
+                            const dy = Math.max(0, platformY - Math.floor(Math.sqrt(dx*dx + dz*dz) * 1.5));
+                            this.setLocalBlock(centerX + dx, dy, centerZ + dz, 7);
+                        }
+                    }
+                    this.buildNeonObelisk(centerX, platformY + 1, centerZ);
+                } else if (game.noiseGen.devSeedType === 'dev3') {
+                    const centerX = 8;
+                    const centerZ = 8;
+                    for (let r = 0; r <= 5; r++) {
+                        for (let a = 0; a < 360; a += 15) {
+                            const rad = a * Math.PI / 180;
+                            const gx = centerX + Math.round(Math.cos(rad) * r);
+                            const gz = centerZ + Math.round(Math.sin(rad) * r);
+                            const height = Math.max(2, game.noiseGen.getHeight(gx, gz) + 2);
+                            this.setLocalBlock(gx, height, gz, 9);
+                            this.setLocalBlock(gx, height - 1, gz, 8);
+                        }
+                    }
+                    this.buildCrystalDome(centerX, Math.max(8, game.noiseGen.getHeight(0,0) + 3), centerZ);
+                }
+            }
+
+            isBlockVisible(x, y, z) {
+                const centerX = 8;
+                const centerZ = 8;
+                const islandHeight = Math.max(10, game.noiseGen.getHeight(0, 0));
+                for (let dx = -5; dx <= 5; dx++) {
+                    for (let dz = -5; dz <= 5; dz++) {
+                        const dist = Math.sqrt(dx * dx + dz * dz);
+                        const height = islandHeight - Math.floor(dist * 1.2);
+                        if (height > 0) {
+                            const gx = centerX + dx;
+                            const gz = centerZ + dz;
+                            if (gx >= 0 && gx < CHUNK_SIZE_XZ && gz >= 0 && gz < CHUNK_SIZE_XZ) {
+                                for (let y = 0; y <= height; y++) {
+                                    const blockId = y === height ? (height <= 3 ? 10 : 1) : (y > height - 3 ? 2 : 3);
+                                    this.setLocalBlock(gx, y, gz, blockId);
+                                }
+                                for (let y = height + 1; y <= SEA_LEVEL; y++) {
+                                    this.setLocalBlock(gx, y, gz, 14);
+                                }
+                            }
+                        }
+                    }
+                }
+                this.buildModernHouse(centerX, islandHeight + 1, centerZ);
             }
 
             isBlockVisible(x, y, z) {
@@ -1921,10 +2199,12 @@
         // Initiale Multiplayer-Logik
         game.mpSession = new MultiplayerSession();
 
-        window.addEventListener('DOMContentLoaded', () => {
+        window.addEventListener('DOMContentLoaded', async () => {
             const randomKey = 'MC-' + Math.random().toString(36).substring(2, 7).toUpperCase();
             document.getElementById('input-session-id').placeholder = randomKey;
             updateMultiplayerUI();
+            await supabaseInitPromise;
+            if (game.mpSession) game.mpSession.fetchLobbies();
         });
 
         async function toggleMultiplayerSession(enable) {
@@ -1968,6 +2248,9 @@
         startBtn.addEventListener('click', async () => {
             game.username  = document.getElementById('input-username').value.trim() || "Steve";
             game.worldSeed = document.getElementById('input-world-seed').value.trim() || "BLOCKWORLD";
+            const seedTag = game.worldSeed.toLowerCase();
+            game.devSeedType = ['dev1', 'dev2', 'dev3'].includes(seedTag) ? seedTag : null;
+            game.isDevSeed = !!game.devSeedType;
             game.worldMode = document.getElementById('select-world-profile').value || 'Standard';
             game.difficulty = document.getElementById('select-world-difficulty').value || 'Normal';
             game.noiseGen  = new BiomeGenerator(game.worldSeed);
@@ -3782,6 +4065,10 @@
             menuSections.forEach(section => {
                 section.classList.toggle('hidden', section.id !== tabId);
             });
+
+            if (tabId === 'tab-multiplayer' && game.mpSession) {
+                game.mpSession.fetchLobbies();
+            }
         }
 
         menuTabs.forEach(tab => {
