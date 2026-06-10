@@ -1676,6 +1676,7 @@
             async fetchLobbies() {
                 if (!dbInstance) return;
                 const lobbyListEl = document.getElementById('lobby-list');
+                lobbyListEl.innerHTML = '<div class="text-xs text-gray-400 italic text-center py-4">Lade aktive Welten...</div>';
                 
                 try {
                     // Wir nutzen die 'players' Tabelle, um aktive Welten zu finden
@@ -2265,6 +2266,7 @@
             
             document.getElementById('session-tag').innerText  = game.isMultiplayerActive ? `SESSION: ${game.sessionId}` : 'SESSION: offline';
             document.getElementById('debug-key').innerText    = game.isMultiplayerActive ? game.sessionId : 'offline';
+            updateMultiplayerUI();
             document.getElementById('generating-screen').classList.remove('hidden');
 
             if (game.isMultiplayerActive) {
