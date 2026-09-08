@@ -223,6 +223,72 @@
         #touch-btn-inventory { left: 18px; top: 18px; width: 54px; height: 54px; }
         #touch-btn-fly { left: 84px; top: 18px; width: 54px; height: 54px; }
         #touch-btn-pause { right: 18px; top: 18px; width: 54px; height: 54px; }
+
+        /* --- iPad / breiterer Tablet-Viewport: Layout-Fix gegen Überlappung --- */
+        /* Fix: Auf iPad überlappten Chat-Fenster, Hotbar, Herzen und die
+           Touch-Buttons, weil alles nur für schmale Handy-Breiten positioniert
+           war. Ab ~700px Breite rücken wir Chat und Buttons auseinander und
+           vergrößern die Bedienelemente etwas für Finger-Bedienung. */
+        @media (min-width: 700px) {
+            #chat-container {
+                width: 340px;
+                height: 170px;
+                left: 24px;
+                bottom: 24px;
+            }
+            #hotbar {
+                transform: scale(1.05);
+            }
+            #hud-container {
+                bottom: 22px;
+            }
+            #touch-joystick-zone {
+                left: 28px;
+                bottom: 28px;
+                width: 150px;
+                height: 150px;
+            }
+            #touch-joystick-knob {
+                left: 40px;
+                top: 40px;
+                width: 70px;
+                height: 70px;
+            }
+            #touch-btn-jump { right: 36px; bottom: 170px; width: 86px; height: 86px; }
+            #touch-btn-mine { right: 132px; bottom: 60px; width: 78px; height: 78px; }
+            #touch-btn-place { right: 36px; bottom: 60px; width: 78px; height: 78px; }
+            #touch-btn-inventory { left: 24px; top: 24px; width: 60px; height: 60px; }
+            #touch-btn-fly { left: 96px; top: 24px; width: 60px; height: 60px; }
+            #touch-btn-pause { right: 24px; top: 24px; width: 60px; height: 60px; }
+            /* Look-Zone etwas schmaler auf großem Screen, damit mehr Platz für
+               Weltansicht bleibt und der Bereich nicht zu dominant ist */
+            #touch-look-zone { width: 45%; }
+            #topleft-hud { top: 24px; left: 24px; }
+            #topright-hud { top: 24px; right: 24px; }
+        }
+
+        /* Landscape auf iPad: Chat und linke Touch-Buttons würden sich mit dem
+           Joystick überschneiden, wenn das Fenster niedrig ist (Split View/
+           Stage Manager) - Chat dann automatisch kompakter und höher */
+        @media (min-width: 700px) and (max-height: 600px) {
+            #chat-container { height: 120px; }
+        }
+
+        /* Fix: Wenn die Touch-Steuerung aktiv ist, sitzt der Joystick unten
+           links - genau dort, wo vorher auch das Chat-Fenster lag (siehe
+           Screenshot-Bug: Chat überlappte Joystick/Baum). Chat rückt dann
+           über den Joystick-Bereich nach oben. */
+        #touch-controls.active ~ #chat-container,
+        body:has(#touch-controls.active) #chat-container,
+        #chat-container.touch-active-chat {
+            bottom: 170px;
+        }
+        @media (min-width: 700px) {
+            body:has(#touch-controls.active) #chat-container,
+            #chat-container.touch-active-chat {
+                bottom: 200px;
+            }
+        }
     </style>
 </head>
 <body class="text-white select-none">
@@ -1092,9 +1158,28 @@
         );
         scene.add(crackMesh);
 
-        const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 1000);
+        // Fix: FOV wird an das Seitenverhältnis angepasst. Ein fixes 70°-FOV auf
+        // schmalen Portrait-Screens (z.B. iPad Hochformat mit Chat/HUD-Overlay,
+        // oder hoher DPR) wirkt "reingezoomt". Wir rechnen ein horizontales FOV
+        // aus, das auf breiten Screens normal bleibt und auf schmalen/hohen
+        // Screens automatisch weiter wird (vertikales FOV wird angehoben).
+        function computeResponsiveFov() {
+            const aspect = window.innerWidth / window.innerHeight;
+            const baseHorizontalFovDeg = 82; // gewünschtes horizontales Sichtfeld
+            const baseHorizontalFovRad = baseHorizontalFovDeg * Math.PI / 180;
+            let verticalFovRad = 2 * Math.atan(Math.tan(baseHorizontalFovRad / 2) / Math.max(aspect, 0.4));
+            let verticalFovDeg = verticalFovRad * 180 / Math.PI;
+            // Grenzen, damit es nie zu extrem/verzerrt wird
+            verticalFovDeg = Math.max(60, Math.min(100, verticalFovDeg));
+            return verticalFovDeg;
+        }
+
+        const camera = new THREE.PerspectiveCamera(computeResponsiveFov(), window.innerWidth / window.innerHeight, 0.1, 1000);
         const renderer = new THREE.WebGLRenderer({ antialias: !isTouchDevice, alpha: false, powerPreference: "high-performance" });
-        renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, isTouchDevice ? 2 : 1.5));
+        // Fix: Auf iPad mit hoher devicePixelRatio (2-3) sorgt ein zu hoher Cap
+        // für unnötige Render-Last UND macht durch starkes Downsampling/UI-Skalierung
+        // die Szene optisch "enger". 2.0 ist ein guter Kompromiss für Schärfe/Performance.
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2.0));
         renderer.setSize(window.innerWidth, window.innerHeight, false);
         renderer.sortObjects = false;
         renderer.autoClear = true;
@@ -2318,6 +2403,7 @@
                 // Touch-Gerät: kein Pointer Lock, Steuerung manuell aktivieren
                 controls.isLocked = true;
                 touchControlsEl.classList.add('active');
+                document.getElementById('chat-container').classList.add('touch-active-chat');
             }
         }
 
@@ -2477,6 +2563,7 @@
             document.getElementById('chat-container').classList.add('hidden');
             document.getElementById('crosshair').classList.add('hidden');
             touchControlsEl.classList.remove('active');
+            document.getElementById('chat-container').classList.remove('touch-active-chat');
             controls.isLocked = false;
             game.isPaused = false;
 
@@ -2516,6 +2603,20 @@
             camera.rotation.set(controls.pitch, controls.yaw, 0, 'YXZ');
         });
 
+        // Fix (iPad + Logitech/Hardware-Tastatur): Die Tasten-Listener liefen
+        // global auf 'window' OHNE zu prüfen, ob gerade ein Text-Eingabefeld
+        // fokussiert ist (z.B. Spielername/Welt-Seed im Hauptmenü oder das
+        // Mod-JSON-Textfeld). Wer dort z.B. "Steve" tippte, löste dabei
+        // gleichzeitig Spiel-Shortcuts aus (t=Chat, e/i=Inventar, c=Fliegen,
+        // f=Debug). Diese Hilfsfunktion erkennt fokussierte Eingabefelder und
+        // lässt Tastatureingaben dort normal durch, ohne Spiel-Shortcuts.
+        function isTypingInFormField() {
+            const el = document.activeElement;
+            if (!el) return false;
+            const tag = el.tagName;
+            return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || el.isContentEditable;
+        }
+
         window.addEventListener('keydown', (e) => {
             if (game.chatInputActive) {
                 if (e.code === 'Enter') {
@@ -2526,9 +2627,38 @@
                 return;
             }
 
+            // Menü-Eingabefelder (Spielername, Welt-Seed, Session-ID, Mod-JSON)
+            // sollen normal tippbar bleiben, ohne dass Buchstaben gleichzeitig
+            // Spiel-Shortcuts auslösen.
+            if (isTypingInFormField()) return;
+
+            // Solange keine Welt geladen ist und kein Inventar offen ist, gibt
+            // es nichts zu steuern - vermeidet versehentliche Shortcut-Auslösung
+            // während man z.B. noch im Hauptmenü mit der Tastatur navigiert.
+            if (!game.isWorldLoaded && !game.inventoryOpen) return;
+
             keys[e.code] = true;
 
-            if (e.code === 'Space') {
+            // Escape schließt Inventar/pausiert - Standardverhalten auf jeder
+            // Hardware-Tastatur (Logi/Magic Keyboard eingeschlossen).
+            if (e.code === 'Escape') {
+                if (game.inventoryOpen) {
+                    closeInventory();
+                    enterGameInputMode();
+                } else if (controls.isLocked) {
+                    exitGameInputMode(true);
+                }
+                return;
+            }
+
+            // Bewegungs-/Aktionstasten: Standard-Browserverhalten unterbinden
+            // (z.B. Leertaste/Pfeiltasten scrollen sonst die Seite, was auf
+            // iPad mit externer Tastatur besonders störend auffällt).
+            if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Tab'].includes(e.code)) {
+                e.preventDefault();
+            }
+
+            if (e.code === 'Space' && !e.repeat) {
                 const now = Date.now();
                 if (now - (game.lastSpaceTime || 0) < 300) {
                     if (game_gamemodes[game.playerId] === 'creative') {
@@ -2541,18 +2671,18 @@
                 game.lastSpaceTime = now;
             }
 
-            if (e.code === 'KeyF' || e.code === 'F3') {
+            if ((e.code === 'KeyF' || e.code === 'F3') && !e.repeat) {
                 e.preventDefault();
                 game.debugActive = !game.debugActive;
                 document.getElementById('debug-screen').classList.toggle('hidden', !game.debugActive);
             }
 
-            if (e.code === 'KeyT') {
+            if (e.code === 'KeyT' && !e.repeat) {
                 e.preventDefault();
                 openChat();
             }
 
-            if (e.code.startsWith('Digit')) {
+            if (e.code.startsWith('Digit') && !e.repeat) {
                 const digitNum = parseInt(e.code.replace('Digit', ''));
                 if (digitNum >= 1 && digitNum <= 9) {
                     const slotIdx = digitNum - 1;
@@ -2565,7 +2695,7 @@
                 }
             }
 
-            if (e.code === 'KeyE' || e.code === 'KeyI') {
+            if ((e.code === 'KeyE' || e.code === 'KeyI') && !e.repeat) {
                 if (controls.isLocked) {
                     if (supportsPointerLock) document.exitPointerLock();
                     openInventory();
@@ -2575,7 +2705,7 @@
                 }
             }
 
-            if (e.code === 'KeyC') {
+            if (e.code === 'KeyC' && !e.repeat) {
                 game.flyMode = !game.flyMode;
                 showNotification(`Flugmodus: ${game.flyMode ? "AKTIV" : "DEAKTIVIERT"}`);
                 updateStatDisplay();
@@ -4460,21 +4590,24 @@
             renderer.render(scene, camera);
         }
 
-        window.addEventListener('resize', () => {
+        function handleViewportResize() {
             camera.aspect = window.innerWidth / window.innerHeight;
+            camera.fov = computeResponsiveFov();
             camera.updateProjectionMatrix();
-            renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, isTouchDevice ? 2 : 1.5));
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2.0));
             renderer.setSize(window.innerWidth, window.innerHeight, false);
-        });
+        }
 
-        // iOS: Adressleiste/Viewport ändert sich beim Scrollen - erneut anpassen
+        window.addEventListener('resize', handleViewportResize);
+
+        // iOS/iPad: Adressleiste, Split-View, Stage-Manager-Fenstergröße oder
+        // Drehung ändern den Viewport nachträglich - erneut anpassen.
         window.addEventListener('orientationchange', () => {
-            setTimeout(() => {
-                camera.aspect = window.innerWidth / window.innerHeight;
-                camera.updateProjectionMatrix();
-                renderer.setSize(window.innerWidth, window.innerHeight, false);
-            }, 300);
+            setTimeout(handleViewportResize, 300);
         });
+        if (window.visualViewport) {
+            window.visualViewport.addEventListener('resize', handleViewportResize);
+        }
 
         animate();
     </script>
