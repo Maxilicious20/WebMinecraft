@@ -155,6 +155,140 @@
             background: #555;
             border: 2px solid #2a2a2a;
         }
+
+        /* --- TOUCH CONTROLS (Mobile / iPad) --- */
+        #touch-controls {
+            position: absolute;
+            inset: 0;
+            z-index: 15;
+            pointer-events: none;
+            display: none;
+        }
+        #touch-controls.active {
+            display: block;
+        }
+        #touch-joystick-zone {
+            position: absolute;
+            left: 18px;
+            bottom: 18px;
+            width: 130px;
+            height: 130px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.08);
+            border: 3px solid rgba(255,255,255,0.25);
+            pointer-events: auto;
+            touch-action: none;
+        }
+        #touch-joystick-knob {
+            position: absolute;
+            left: 35px;
+            top: 35px;
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.35);
+            border: 3px solid rgba(255,255,255,0.6);
+            pointer-events: none;
+        }
+        #touch-look-zone {
+            position: absolute;
+            right: 0;
+            top: 0;
+            bottom: 0;
+            width: 55%;
+            pointer-events: auto;
+            touch-action: none;
+        }
+        .touch-btn {
+            position: absolute;
+            pointer-events: auto;
+            touch-action: none;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(0,0,0,0.45);
+            border: 3px solid rgba(255,255,255,0.35);
+            color: #fff;
+            font-family: 'Press Start 2P', monospace;
+            font-size: 9px;
+            user-select: none;
+        }
+        .touch-btn:active {
+            background: rgba(255,255,255,0.3);
+        }
+        #touch-btn-jump { right: 24px; bottom: 130px; width: 76px; height: 76px; }
+        #touch-btn-mine { right: 110px; bottom: 40px; width: 68px; height: 68px; background: rgba(180,30,30,0.55); }
+        #touch-btn-place { right: 24px; bottom: 40px; width: 68px; height: 68px; background: rgba(30,120,60,0.55); }
+        #touch-btn-inventory { left: 18px; top: 18px; width: 54px; height: 54px; }
+        #touch-btn-fly { left: 84px; top: 18px; width: 54px; height: 54px; }
+        #touch-btn-pause { right: 18px; top: 18px; width: 54px; height: 54px; }
+
+        /* --- iPad / breiterer Tablet-Viewport: Layout-Fix gegen Überlappung --- */
+        /* Fix: Auf iPad überlappten Chat-Fenster, Hotbar, Herzen und die
+           Touch-Buttons, weil alles nur für schmale Handy-Breiten positioniert
+           war. Ab ~700px Breite rücken wir Chat und Buttons auseinander und
+           vergrößern die Bedienelemente etwas für Finger-Bedienung. */
+        @media (min-width: 700px) {
+            #chat-container {
+                width: 340px;
+                height: 170px;
+                left: 24px;
+                bottom: 24px;
+            }
+            #hotbar {
+                transform: scale(1.05);
+            }
+            #hud-container {
+                bottom: 22px;
+            }
+            #touch-joystick-zone {
+                left: 28px;
+                bottom: 28px;
+                width: 150px;
+                height: 150px;
+            }
+            #touch-joystick-knob {
+                left: 40px;
+                top: 40px;
+                width: 70px;
+                height: 70px;
+            }
+            #touch-btn-jump { right: 36px; bottom: 170px; width: 86px; height: 86px; }
+            #touch-btn-mine { right: 132px; bottom: 60px; width: 78px; height: 78px; }
+            #touch-btn-place { right: 36px; bottom: 60px; width: 78px; height: 78px; }
+            #touch-btn-inventory { left: 24px; top: 24px; width: 60px; height: 60px; }
+            #touch-btn-fly { left: 96px; top: 24px; width: 60px; height: 60px; }
+            #touch-btn-pause { right: 24px; top: 24px; width: 60px; height: 60px; }
+            /* Look-Zone etwas schmaler auf großem Screen, damit mehr Platz für
+               Weltansicht bleibt und der Bereich nicht zu dominant ist */
+            #touch-look-zone { width: 45%; }
+            #topleft-hud { top: 24px; left: 24px; }
+            #topright-hud { top: 24px; right: 24px; }
+        }
+
+        /* Landscape auf iPad: Chat und linke Touch-Buttons würden sich mit dem
+           Joystick überschneiden, wenn das Fenster niedrig ist (Split View/
+           Stage Manager) - Chat dann automatisch kompakter und höher */
+        @media (min-width: 700px) and (max-height: 600px) {
+            #chat-container { height: 120px; }
+        }
+
+        /* Fix: Wenn die Touch-Steuerung aktiv ist, sitzt der Joystick unten
+           links - genau dort, wo vorher auch das Chat-Fenster lag (siehe
+           Screenshot-Bug: Chat überlappte Joystick/Baum). Chat rückt dann
+           über den Joystick-Bereich nach oben. */
+        #touch-controls.active ~ #chat-container,
+        body:has(#touch-controls.active) #chat-container,
+        #chat-container.touch-active-chat {
+            bottom: 170px;
+        }
+        @media (min-width: 700px) {
+            body:has(#touch-controls.active) #chat-container,
+            #chat-container.touch-active-chat {
+                bottom: 200px;
+            }
+        }
     </style>
 </head>
 <body class="text-white select-none">
@@ -173,6 +307,18 @@
         <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path d="M12 2V22M2 12H22" stroke="white" stroke-width="2.5" stroke-linecap="square"/>
         </svg>
+    </div>
+
+    <!-- TOUCH CONTROLS OVERLAY (Mobile/iPad) -->
+    <div id="touch-controls">
+        <div id="touch-joystick-zone"><div id="touch-joystick-knob"></div></div>
+        <div id="touch-look-zone"></div>
+        <div id="touch-btn-jump" class="touch-btn">SPRUNG</div>
+        <div id="touch-btn-mine" class="touch-btn">ABBAU</div>
+        <div id="touch-btn-place" class="touch-btn">BAUEN</div>
+        <div id="touch-btn-inventory" class="touch-btn">INV</div>
+        <div id="touch-btn-fly" class="touch-btn">FLUG</div>
+        <div id="touch-btn-pause" class="touch-btn">II</div>
     </div>
 
     <!-- F3 Debug Overlay Screen -->
@@ -583,9 +729,6 @@
             canvas.width = 16;
             canvas.height = 16;
             const ctx = canvas.getContext('2d');
-            
-            ctx.fillStyle = colorBase;
-            ctx.fillRect(0, 0, 16, 16);
 
             const hexToRgb = (hex) => {
                 const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
@@ -597,6 +740,24 @@
             };
 
             const rgb = hexToRgb(colorBase);
+
+            // Unbekannter Block: einmalig zeichnen statt pro Pixel (Performance-Fix)
+            if (type === 'unknown') {
+                ctx.fillStyle = colorBase;
+                ctx.fillRect(0, 0, 16, 16);
+                ctx.fillStyle = '#ffffff';
+                ctx.font = 'bold 12px monospace';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('?', 8, 8);
+                const texture = new THREE.CanvasTexture(canvas);
+                texture.magFilter = THREE.NearestFilter;
+                texture.minFilter = THREE.NearestFilter;
+                return texture;
+            }
+
+            ctx.fillStyle = colorBase;
+            ctx.fillRect(0, 0, 16, 16);
 
             for (let x = 0; x < 16; x++) {
                 for (let y = 0; y < 16; y++) {
@@ -622,20 +783,8 @@
                             continue;
                         }
                     } else if (type === 'water') {
-                        noise = Math.sin(x * 0.5) * 15;
-                        noise = Math.sin(x * 0.5) * 10 + Math.cos(y * 0.5) * 10;
-                        // Flaches blaues Wasser ohne Rauschen für besseren Look
-                        noise = 0;
-                    } else if (type === 'unknown') {
-                        // Rote Warnblock-Textur mit Fragezeichen
-                        ctx.fillStyle = colorBase;
-                        ctx.fillRect(0, 0, 16, 16);
-                        ctx.fillStyle = '#ffffff';
-                        ctx.font = 'bold 12px monospace';
-                        ctx.textAlign = 'center';
-                        ctx.textBaseline = 'middle';
-                        ctx.fillText('?', 8, 8);
-                        break;
+                        // Sanfte, ruhige Wasseroberfläche ohne hartes Rauschen
+                        noise = Math.sin(x * 0.6 + y * 0.3) * 8;
                     }
 
                     const nr = Math.max(0, Math.min(255, rgb.r + noise));
@@ -671,10 +820,15 @@
 
         const supabaseInitPromise = initSupabase().catch(err => console.warn("Supabase-Initialisierung fehlgeschlagen:", err));
 
+        // --- MOBILE / TOUCH DETECTION (Fix: iPad Support) ---
+        const isTouchDevice = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0) || (navigator.msMaxTouchPoints > 0);
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+        const supportsPointerLock = !!(document.body.requestPointerLock) && !isTouchDevice;
+
         // --- OPTIMIERTE CHUNK CONFIG ---
         const CHUNK_SIZE_XZ = 16;
         const CHUNK_HEIGHT = 48;
-        let RENDER_RADIUS = 3; 
+        let RENDER_RADIUS = isTouchDevice ? 2 : 3; 
         const MAX_Y = CHUNK_HEIGHT - 1;
         const SEA_LEVEL = 12;
         
@@ -728,6 +882,13 @@
             activeMobs: [],
             lastStepTime: 0,
             droppedItems: [],
+            isPaused: false,
+        };
+
+        // Touch-Steuerungszustand (Fix: iPad/Mobile Support)
+        const touchState = {
+            forward: false, backward: false, left: false, right: false,
+            jump: false, flyDown: false
         };
 
         const CLIENT_VERSION = "2.1.0";
@@ -758,11 +919,14 @@
             ctx: null,
             init() {
                 if (this.ctx) return;
-                this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+                const AC = window.AudioContext || window.webkitAudioContext;
+                if (!AC) return;
+                this.ctx = new AC();
                 if (this.ctx.state === 'suspended') this.ctx.resume();
             },
             playSound(name, volume = 0.3) {
                 this.init();
+                if (!this.ctx) return;
                 const now = this.ctx.currentTime;
                 const osc = this.ctx.createOscillator();
                 const gain = this.ctx.createGain();
@@ -929,9 +1093,9 @@
                 mats.push(new THREE.MeshStandardMaterial({
                     map: texture,
                     transparent: !!blockDef.transparent,
-                    opacity: blockDef.id === 14 ? 0.5 : (blockDef.transparent ? 0.8 : 1.0),
-                    roughness: 0.9,
-                    metalness: 0.1
+                    opacity: blockDef.id === 14 ? 0.6 : (blockDef.transparent ? 0.85 : 1.0),
+                    roughness: blockDef.id === 14 ? 0.25 : 0.9,
+                    metalness: blockDef.id === 14 ? 0.15 : 0.05
                 }));
             }
             materialCache[cacheKey] = mats;
@@ -941,9 +1105,9 @@
         async function loadTexturesFromFolder() {
             console.log("Starte Textur-Ladevorgang aus dem /textures/ Ordner...");
             const textureNames = [
-                'grasblock','erde','stein','eichenholz','laub',
-                'holzblock','sand','kaktus','tnt',
-                'kohle', 'eisen', 'gold'
+                'grasblock','erde','stein','pflasterstein','eichenholz','laub',
+                'holzblock','ziegelstein','glasblock','sand','kaktus','tnt',
+                'wasser','lava','stocke','werkbank','kohle', 'eisen', 'gold'
             ];
             
             const loader = new THREE.TextureLoader();
@@ -962,7 +1126,7 @@
                         },
                         undefined,
                         (err) => {
-                            console.warn(`Textur textures/${name}.png nicht gefunden oder CORS-Fehler.`);
+                            console.warn(`Textur textures/${name}.png nicht gefunden oder CORS-Fehler. Nutze prozedurale Textur als Fallback.`);
                             resolve();
                         }
                     );
@@ -972,7 +1136,9 @@
             await Promise.all(promises);
             console.log("Textur-Ladevorgang beendet.");
         }
+    </script>
 
+    <script>
         // --- GRAFIK SETUP ---
         const container = document.getElementById('canvas-container');
         const scene = new THREE.Scene();
@@ -992,13 +1158,51 @@
         );
         scene.add(crackMesh);
 
-        const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 1000);
-        const renderer = new THREE.WebGLRenderer({ antialias: false, alpha: false, powerPreference: "high-performance" });
-        renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.25));
-        renderer.setSize(window.innerWidth, window.innerHeight, false);
+        // Fix: iOS Safari liefert window.innerWidth/innerHeight direkt nach dem
+        // Laden manchmal noch einen falschen Wert (siehe unten in
+        // handleViewportResize für Details). window.visualViewport ist auf iOS
+        // zuverlässiger und wird daher, wenn verfügbar, bevorzugt - auch schon
+        // bei der allerersten Kamera/Renderer-Erstellung.
+        function getViewportSize() {
+            if (window.visualViewport) {
+                return {
+                    width: window.visualViewport.width,
+                    height: window.visualViewport.height
+                };
+            }
+            return { width: window.innerWidth, height: window.innerHeight };
+        }
+
+        // Fix: FOV wird an das Seitenverhältnis angepasst. Ein fixes 70°-FOV auf
+        // schmalen Portrait-Screens (z.B. iPad Hochformat mit Chat/HUD-Overlay,
+        // oder hoher DPR) wirkt "reingezoomt". Wir rechnen ein horizontales FOV
+        // aus, das auf breiten Screens normal bleibt und auf schmalen/hohen
+        // Screens automatisch weiter wird (vertikales FOV wird angehoben).
+        function computeResponsiveFov() {
+            const size = getViewportSize();
+            const aspect = size.width / size.height;
+            const baseHorizontalFovDeg = 82; // gewünschtes horizontales Sichtfeld
+            const baseHorizontalFovRad = baseHorizontalFovDeg * Math.PI / 180;
+            let verticalFovRad = 2 * Math.atan(Math.tan(baseHorizontalFovRad / 2) / Math.max(aspect, 0.4));
+            let verticalFovDeg = verticalFovRad * 180 / Math.PI;
+            // Grenzen, damit es nie zu extrem/verzerrt wird
+            verticalFovDeg = Math.max(60, Math.min(100, verticalFovDeg));
+            return verticalFovDeg;
+        }
+
+        const _initialViewport = getViewportSize();
+        const camera = new THREE.PerspectiveCamera(computeResponsiveFov(), _initialViewport.width / _initialViewport.height, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: !isTouchDevice, alpha: false, powerPreference: "high-performance" });
+        // Fix: Auf iPad mit hoher devicePixelRatio (2-3) sorgt ein zu hoher Cap
+        // für unnötige Render-Last UND macht durch starkes Downsampling/UI-Skalierung
+        // die Szene optisch "enger". 2.0 ist ein guter Kompromiss für Schärfe/Performance.
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2.0));
+        renderer.setSize(_initialViewport.width, _initialViewport.height, false);
         renderer.sortObjects = false;
         renderer.autoClear = true;
+        renderer.outputColorSpace = THREE.SRGBColorSpace || renderer.outputColorSpace;
         container.appendChild(renderer.domElement);
+        renderer.domElement.style.touchAction = 'none';
 
         armGroup = new THREE.Group();
         armMesh = new THREE.Mesh(
@@ -1009,23 +1213,21 @@
         armGroup.add(armMesh);
         scene.add(armGroup);
 
-        // --- LICHTER ---
-        const ambientLight = new THREE.AmbientLight(0xffffff, 0.55);
+        // --- LICHTER (verbessert für klarere, hellere Grafik) ---
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.65);
         scene.add(ambientLight);
 
-        const dirLight = new THREE.DirectionalLight(0xffffff, 0.85);
+        const dirLight = new THREE.DirectionalLight(0xffffff, 0.95);
         dirLight.position.set(15, 45, 10);
         scene.add(dirLight);
         // Mond-Licht (sanfter, kühler Lichtgeber für Nacht)
-        const moonLight = new THREE.DirectionalLight(0x99aaff, 0.06);
+        const moonLight = new THREE.DirectionalLight(0x99aaff, 0.08);
         moonLight.position.set(-15, -45, -10);
         scene.add(moonLight);
 
-        // ─────────────────────────────────────────────────────────
-        // FIX: Alle Himmelsobjekte NUR EINMAL deklarieren
-        // (vorher waren sunGeo/sunMat/sunMesh/moonGeo/moonMat
-        //  doppelt deklariert → "Cannot redeclare block-scoped variable")
-        // ─────────────────────────────────────────────────────────
+        // Fülllicht von unten, damit Blockunterseiten nicht komplett schwarz wirken
+        const fillLight = new THREE.HemisphereLight(0xbfe0ff, 0x3a2e20, 0.35);
+        scene.add(fillLight);
 
         // SONNE
         const sunGeo  = new THREE.BoxGeometry(20, 20, 5);
@@ -1036,8 +1238,8 @@
         // MOND
         const moonGeo  = new THREE.BoxGeometry(15, 15, 5);
         const moonMat  = new THREE.MeshBasicMaterial({ color: 0xe0e0e0 });
-        const moonMesh = new THREE.Mesh(moonGeo, moonMat);   // FIX: moonMesh fehlte komplett
-        scene.add(moonMesh);                                  // FIX: scene.add fehlte
+        const moonMesh = new THREE.Mesh(moonGeo, moonMat);
+        scene.add(moonMesh);
 
         // WOLKEN
         const cloudGroup = new THREE.Group();
@@ -1058,24 +1260,21 @@
         }
         scene.add(cloudGroup);
 
-        // STERNE – FIX: BufferGeometry mit echten Vertex-Daten befüllen
-        // (vorher war starsGeometry leer → keine Sterne sichtbar)
+        // STERNE
         const starsGeometry = new THREE.BufferGeometry();
         const starCount = 2000;
         const starPositions = new Float32Array(starCount * 3);
         const starColors    = new Float32Array(starCount * 3);
 
         for (let i = 0; i < starCount; i++) {
-            // Zufällige Punkte auf einer großen Kugel um den Ursprung
             const theta = Math.random() * Math.PI * 2;
             const phi   = Math.acos(2 * Math.random() - 1);
             const r     = 450;
 
             starPositions[i * 3]     = r * Math.sin(phi) * Math.cos(theta);
-            starPositions[i * 3 + 1] = Math.abs(r * Math.cos(phi)); // Nur obere Hemisphäre
+            starPositions[i * 3 + 1] = Math.abs(r * Math.cos(phi));
             starPositions[i * 3 + 2] = r * Math.sin(phi) * Math.sin(theta);
 
-            // Leicht variierte Sternfarben (weiß/bläulich/gelblich)
             const brightness = 0.7 + Math.random() * 0.3;
             starColors[i * 3]     = brightness;
             starColors[i * 3 + 1] = brightness;
@@ -1146,7 +1345,6 @@
                     return { name: "Island", heightOffset: 10, scale: 8, topBlock: 1, subBlock: 3, treeChance: 0.18 };
                 }
 
-                // Temperatur und Feuchtigkeit bestimmen das Biom
                 const heat     = this.noiseGen.fbm(x * 0.004, z * 0.004, 2);
                 const moisture = this.noiseGen.fbm(x * 0.004 + 500, z * 0.004 + 500, 2);
 
@@ -1157,7 +1355,7 @@
                 } else if (heat > 0.3 && heat < 0.7 && moisture > 0.5) {
                     return { name: "Forest",   heightOffset: 12, scale: 8,  topBlock: 1,  subBlock: 2, treeChance: 0.38 };
                 } else if (heat < 0.35) {
-                    return { name: "Tundra",   heightOffset: 12, scale: 10, topBlock: 9,  subBlock: 3, treeChance: 0.02 }; // Nutze Glas als Schnee-Ersatz
+                    return { name: "Tundra",   heightOffset: 12, scale: 10, topBlock: 9,  subBlock: 3, treeChance: 0.02 };
                 } else if (heat > 0.5 && moisture < 0.3) {
                     return { name: "Mountain", heightOffset: 15, scale: 25, topBlock: 3,  subBlock: 3, treeChance: 0.01 };
                 } else {
@@ -1222,8 +1420,6 @@
             }
 
             isCave(gx, gy, gz) {
-                // Höhlen generieren nur unterhalb der Oberfläche
-                // Optimierung: Nur eine Ebene Noise statt FBM (spart 50% Rechenlast)
                 return this.caveNoise.noise3D(gx * 0.08, gy * 0.15, gz * 0.08) > 0.62;
             }
         }
@@ -1270,18 +1466,16 @@
                                 blockId = 3; // Stein
                             }
                             
-                            // Höhlen-System Check
                             if (y < finalHeight - 1 && y > 1) {
                                 if (game.noiseGen.isCave(gx, y, gz)) {
                                     blockId = 0;
                                 } else if (blockId === 3) {
-                                    // Erze generieren (nur in Steinwänden)
                                     const oreVal = game.noiseGen.caveNoise.fbm3D(gx * 0.2, y * 0.2, gz * 0.2, 1);
                                     if (oreVal > 0.82) {
                                         const typeVal = game.noiseGen.caveNoise.random3D(gx, y, gz);
-                                        if (y < 15 && typeVal > 0.96) blockId = 20;      // Gold (nur tief)
-                                        else if (y < 30 && typeVal > 0.88) blockId = 19; // Eisen
-                                        else if (typeVal > 0.75) blockId = 18;           // Kohle
+                                        if (y < 15 && typeVal > 0.96) blockId = 20;
+                                        else if (y < 30 && typeVal > 0.88) blockId = 19;
+                                        else if (typeVal > 0.75) blockId = 18;
                                     }
                                 }
                             }
@@ -1296,7 +1490,6 @@
                             }
                         }
 
-                        // Wasser bis zum Meeresspiegel auffüllen
                         for (let y = finalHeight + 1; y <= SEA_LEVEL; y++) {
                             const coord = `${gx},${y},${gz}`;
                             if (game.modifiedBlocks[coord] === undefined) {
@@ -1306,25 +1499,25 @@
 
                         const seedValue = game.noiseGen.noiseGen.random2D(gx, gz);
                         if (x === 8 && z === 8) {
-                                    if (game.noiseGen.isDevSeed) {
-                            if (game.noiseGen.devSeedType === 'dev1') {
-                                if (seedValue > 0.78 && finalHeight <= 2) {
-                                    this.buildShipwreck(x, finalHeight, z);
-                                } else if (seedValue > 0.58 && finalHeight > 0) {
-                                    this.buildModernHouse(x, finalHeight, z);
+                            if (game.noiseGen.isDevSeed) {
+                                if (game.noiseGen.devSeedType === 'dev1') {
+                                    if (seedValue > 0.78 && finalHeight <= 2) {
+                                        this.buildShipwreck(x, finalHeight, z);
+                                    } else if (seedValue > 0.58 && finalHeight > 0) {
+                                        this.buildModernHouse(x, finalHeight, z);
+                                    }
+                                } else if (game.noiseGen.devSeedType === 'dev2') {
+                                    if (seedValue > 0.65) {
+                                        this.buildNeonObelisk(x, finalHeight + 1, z);
+                                    } else if (finalHeight > 2) {
+                                        this.buildFloatingPlatform(x, finalHeight, z);
+                                    }
+                                } else if (game.noiseGen.devSeedType === 'dev3') {
+                                    if (seedValue > 0.6 && finalHeight > 3) {
+                                        this.buildCrystalDome(x, finalHeight, z);
+                                    }
                                 }
-                            } else if (game.noiseGen.devSeedType === 'dev2') {
-                                if (seedValue > 0.65) {
-                                    this.buildNeonObelisk(x, finalHeight + 1, z);
-                                } else if (finalHeight > 2) {
-                                    this.buildFloatingPlatform(x, finalHeight, z);
-                                }
-                            } else if (game.noiseGen.devSeedType === 'dev3') {
-                                if (seedValue > 0.6 && finalHeight > 3) {
-                                    this.buildCrystalDome(x, finalHeight, z);
-                                }
-                            }
-                        } else {
+                            } else {
                                 if (b.name === "Forest" && seedValue > 0.35) {
                                     this.buildTree(x, finalHeight, z, 5, 6);
                                 } else if (b.name === "Plains" && seedValue > 0.92) {
@@ -1539,68 +1732,34 @@
                 }
             }
 
-            isBlockVisible(x, y, z) {
-                const centerX = 8;
-                const centerZ = 8;
-                const islandHeight = Math.max(10, game.noiseGen.getHeight(0, 0));
-                for (let dx = -5; dx <= 5; dx++) {
-                    for (let dz = -5; dz <= 5; dz++) {
-                        const dist = Math.sqrt(dx * dx + dz * dz);
-                        const height = islandHeight - Math.floor(dist * 1.2);
-                        if (height > 0) {
-                            const gx = centerX + dx;
-                            const gz = centerZ + dz;
-                            if (gx >= 0 && gx < CHUNK_SIZE_XZ && gz >= 0 && gz < CHUNK_SIZE_XZ) {
-                                for (let y = 0; y <= height; y++) {
-                                    const blockId = y === height ? (height <= 3 ? 10 : 1) : (y > height - 3 ? 2 : 3);
-                                    this.setLocalBlock(gx, y, gz, blockId);
-                                }
-                                for (let y = height + 1; y <= SEA_LEVEL; y++) {
-                                    this.setLocalBlock(gx, y, gz, 14);
-                                }
-                            }
-                        }
-                    }
-                }
-                this.buildModernHouse(centerX, islandHeight + 1, centerZ);
-            }
-
+            // Fix: doppelte/fehlerhafte isBlockVisible-Definition entfernt (verursachte
+            // ungenutzten, verwirrenden Code). Es existiert nun nur noch die korrekte
+            // Sichtbarkeitsprüfung unten.
             isBlockVisible(x, y, z) {
                 const myId = this.blocks[this.getIndex(x, y, z)];
                 if (myId === 0) return false;
                 const myDef = getBlockDef(myId) || {};
 
-                // Globale Koordinaten für die Nachbarschaftsprüfung (behebt Glass Bug an Grenzen)
                 const gx = this.cx * CHUNK_SIZE_XZ + x;
                 const gy = y;
                 const gz = this.cz * CHUNK_SIZE_XZ + z;
 
                 const checkSide = (nx, ny, nz) => {
-                    // getGlobalBlock prüft über alle Chunks hinweg
                     const nId = getGlobalBlock(nx, ny, nz);
                     
-                    // 1. Unbekannter/Ungeladener Chunk -> Fläche nicht zeichnen (Fix Glass Bug)
                     if (nId === -1) return false;
-
-                    // 2. Luft -> Fläche zeichnen
                     if (nId === 0) return true;
                     
                     const nDef = getBlockDef(nId);
                     if (!nDef) return true;
 
-                    // 3. Gleiche transparente Blöcke oder Fluide cullen (Fix Scheiben-Effekt)
                     if (nId === myId && (nDef.transparent || nDef.fluid)) return false;
-
-                    // 4. Feststoffe zeichnen Flächen gegen Transparenz oder Fluide
                     if (!myDef.fluid && (nDef.transparent || nDef.fluid)) return true;
-                    
-                    // 5. Fluide zeichnen Flächen gegen Luft oder andere Blocktypen
                     if (myDef.fluid && nId !== myId) return true;
 
                     return false;
                 };
 
-                // Prüfe alle 6 Seiten global
                 return checkSide(gx - 1, gy, gz) || checkSide(gx + 1, gy, gz) ||
                        checkSide(gx, gy - 1, gz) || checkSide(gx, gy + 1, gz) ||
                        checkSide(gx, gy, gz - 1) || checkSide(gx, gy, gz + 1);
@@ -1645,7 +1804,9 @@
                 });
             }
         }
+    </script>
 
+    <script>
         // --- REALTIME MULTIPLAYER SYNC ---
         class MultiplayerSession {
             constructor() {
@@ -1676,14 +1837,13 @@
             async fetchLobbies() {
                 if (!dbInstance) return;
                 const lobbyListEl = document.getElementById('lobby-list');
+                lobbyListEl.innerHTML = '<div class="text-xs text-gray-400 italic text-center py-4">Lade aktive Welten...</div>';
                 
                 try {
-                    // Wir nutzen die 'players' Tabelle, um aktive Welten zu finden
-                    // In einem echten System gäbe es eine 'lobbies' Tabelle, aber wir nutzen 'players' als Proxy
                     const { data, error } = await dbInstance
                         .from('players')
                         .select('session_id, username')
-                        .gt('updated_at', new Date(Date.now() - 30000).toISOString()); // Nur Spieler der letzten 30s
+                        .gt('updated_at', new Date(Date.now() - 30000).toISOString());
 
                     if (error) throw error;
 
@@ -1724,7 +1884,6 @@
                 this.sessionId = sessionId;
                 if (!dbInstance) return;
 
-                // Bestehende Abos kündigen und ersetzte Spieler entfernen
                 for (const pid in game.players) {
                     this.removeRemotePlayer(pid);
                 }
@@ -1750,7 +1909,6 @@
                 }
                 updateStatPlayersCount();
 
-                // Lade und wende historische Welt-Änderungen an (damit neue Clients bereits gebaute Blöcke sehen)
                 try {
                     const { data: changes, error: changesErr } = await dbInstance
                         .from('world_changes')
@@ -1771,14 +1929,12 @@
                             showNotification('Kompatibilitätswarnung: Diese Welt enthält unbekannte Blöcke. Unbekannte Blöcke werden als rote Barrieren angezeigt.');
                             addChatMessage('<span class="text-red-400 font-bold">Achtung:</span> In dieser Welt wurden nicht erkannte Blöcke gefunden.', true);
                         }
-                        // Rebuild all current chunks so changes become visible
                         Object.values(game.chunks).forEach(ch => queueChunkRebuild(ch));
                     }
                 } catch (e) {
                     console.warn('Fehler beim Laden historischer Weltänderungen:', e);
                 }
 
-                // Sofort lokalen Spieler in DB registrieren (setzt initiale Position und Meta)
                 try {
                     const { error: upsertError } = await dbInstance.from('players').upsert({
                         id: game.playerId,
@@ -1788,7 +1944,6 @@
                         y: camera.position.y - 1,
                         z: camera.position.z,
                         yaw: controls.yaw,
-                        client_version: CLIENT_VERSION,
                         updated_at: new Date().toISOString()
                     });
                     if (upsertError) console.warn('Fehler beim Upsert des lokalen Spielers:', upsertError);
@@ -1876,9 +2031,6 @@
                 }
 
                 const playerGhost = game.players[pid].group;
-                // Interpolation für flüssigere Bewegung
-                playerGhost.position.lerp(new THREE.Vector3(data.x, data.y, data.z), 0.2);
-                // Position direkt setzen oder lerp verwenden
                 playerGhost.position.lerp(new THREE.Vector3(data.x, data.y, data.z), 0.3);
                 playerGhost.rotation.y = data.yaw;
                 updateStatPlayersCount();
@@ -1896,7 +2048,7 @@
             sendLocalPosition() {
                 if (!dbInstance) return;
                 const now = Date.now();
-                if (now - game.lastSendTime < 50) return; // 20 FPS Update-Rate
+                if (now - game.lastSendTime < 50) return;
                 game.lastSendTime = now;
 
                 dbInstance
@@ -1906,17 +2058,14 @@
                         session_id: this.sessionId,
                         username: game.username,
                         x: camera.position.x,
-                        y: camera.position.y - 1, // Leicht versetzt für Füße
+                        y: camera.position.y - 1,
                         z: camera.position.z,
                         yaw: controls.yaw,
-                        client_version: CLIENT_VERSION,
                         updated_at: new Date().toISOString()
                     })
                     .then(({ data, error }) => {
                         if (error) console.warn("Upload Position Fehler:", error);
                     });
-
-                    // Keine zusätzliche Session-Tabelle synchronisieren, wenn sie nicht vorhanden ist.
             }
 
             async cleanupSessionIfEmpty() {
@@ -1991,14 +2140,13 @@
             const cz       = Math.floor(gz / CHUNK_SIZE_XZ);
             const chunkKey = `${cx},${cz}`;
             const chunk    = game.chunks[chunkKey];
-            if (!chunk) return -1; // -1 signalisiert einen ungeladenen Chunk
+            if (!chunk) return -1;
 
             const rx = ((gx % CHUNK_SIZE_XZ) + CHUNK_SIZE_XZ) % CHUNK_SIZE_XZ;
             const rz = ((gz % CHUNK_SIZE_XZ) + CHUNK_SIZE_XZ) % CHUNK_SIZE_XZ;
             return chunk.blocks[chunk.getIndex(rx, gy, rz)];
         }
 
-        // Prüft, ob eine Position direkten Blick zum Himmel hat (keine Blöcke darüber)
         function isExposedToSky(x, y, z) {
             const startY = Math.floor(y);
             for (let yy = startY; yy < CHUNK_HEIGHT; yy++) {
@@ -2147,7 +2295,9 @@
                 statChunks.innerText = Object.keys(game.chunks).length;
             }
         }
+    </script>
 
+    <script>
         // --- FIRST PERSON PHYSICS ---
         const controls = {
             moveForward: false,
@@ -2175,6 +2325,7 @@
         const closeModGuideBtn= document.getElementById('btn-close-mod-guide');
         const btnToggleMultiplayer = document.getElementById('btn-toggle-multiplayer');
         const btnToggleMultiplayerPause = document.getElementById('btn-toggle-multiplayer-pause');
+        const touchControlsEl = document.getElementById('touch-controls');
 
         injectModBtn.addEventListener('click', () => {
             const json = document.getElementById('input-mod-json').value;
@@ -2245,6 +2396,45 @@
             }
         }
 
+        // Fix (iPad/Mobile): Startet den Eingabemodus. Auf Touch-Geräten wird kein
+        // Pointer Lock verwendet (iOS Safari unterstützt dieses API generell nicht),
+        // stattdessen werden die Touch-Steuerelemente aktiviert. Das Hauptmenü wird
+        // IMMER explizit ausgeblendet - vorher hing das nur am 'pointerlockchange'
+        // Event, das auf iPad nie feuerte, wodurch das Menü sichtbar blieb und es so
+        // aussah, als würde das Spiel "zurück ins Hauptmenü" springen.
+        function enterGameInputMode() {
+            menuOverlay.classList.add('hidden');
+            pauseOverlay.classList.add('hidden');
+            closeInventory();
+            game.isPaused = false;
+
+            if (supportsPointerLock) {
+                const lockPromise = container.requestPointerLock();
+                if (lockPromise && typeof lockPromise.catch === 'function') {
+                    lockPromise.catch(() => {
+                        // Pointer Lock fehlgeschlagen (z.B. Berechtigung verweigert) -
+                        // Spiel bleibt trotzdem spielbar, Steuerung per Klick/Touch.
+                    });
+                }
+            } else {
+                // Touch-Gerät: kein Pointer Lock, Steuerung manuell aktivieren
+                controls.isLocked = true;
+                touchControlsEl.classList.add('active');
+                document.getElementById('chat-container').classList.add('touch-active-chat');
+            }
+        }
+
+        function exitGameInputMode(showPause) {
+            controls.isLocked = false;
+            if (supportsPointerLock && document.pointerLockElement === container) {
+                document.exitPointerLock();
+            }
+            if (showPause && !game.inventoryOpen && !game.chatInputActive && game.playerHealth > 0 && game.isWorldLoaded) {
+                game.isPaused = true;
+                pauseOverlay.classList.remove('hidden');
+            }
+        }
+
         startBtn.addEventListener('click', async () => {
             game.username  = document.getElementById('input-username').value.trim() || "Steve";
             game.worldSeed = document.getElementById('input-world-seed').value.trim() || "BLOCKWORLD";
@@ -2256,6 +2446,9 @@
             game.noiseGen  = new BiomeGenerator(game.worldSeed);
 
             RENDER_RADIUS = parseInt(document.getElementById('select-render-distance').value);
+            // Auf Touch-Geräten Sichtweite etwas begrenzen, um Ruckler zu vermeiden
+            if (isTouchDevice) RENDER_RADIUS = Math.min(RENDER_RADIUS, 3);
+
             await loadTexturesFromFolder();
             
             let sessId = document.getElementById('input-session-id').value.trim().toUpperCase();
@@ -2265,10 +2458,20 @@
             
             document.getElementById('session-tag').innerText  = game.isMultiplayerActive ? `SESSION: ${game.sessionId}` : 'SESSION: offline';
             document.getElementById('debug-key').innerText    = game.isMultiplayerActive ? game.sessionId : 'offline';
+            updateMultiplayerUI();
             document.getElementById('generating-screen').classList.remove('hidden');
+            // Fix: Menü sofort aus dem Weg räumen, sobald die Generierung beginnt,
+            // damit es auf keinem Gerät (auch ohne Pointer Lock Support) sichtbar
+            // über dem Ladebildschirm/der Welt hängen bleibt.
+            menuOverlay.classList.add('hidden');
 
             if (game.isMultiplayerActive) {
-                await game.mpSession.join(game.sessionId);
+                try {
+                    await game.mpSession.join(game.sessionId);
+                } catch (e) {
+                    console.warn('Multiplayer-Verbindung fehlgeschlagen, Offline-Modus wird fortgesetzt:', e);
+                    showNotification('Multiplayer-Verbindung fehlgeschlagen. Offline Welt wird geladen.');
+                }
             } else {
                 showNotification('Multiplayer ist deaktiviert. Offline Welt wird geladen.');
             }
@@ -2277,7 +2480,6 @@
                 AudioEngine.init();
                 AudioEngine.toggleMusic(true);
             }
-            // Ambient System initialisieren
             AudioEngine.init();
             if (game.isMultiplayerActive) listenToChat();
 
@@ -2294,57 +2496,65 @@
             const startTime = Date.now();
 
             async function loadNextChunk() {
-                if (loadedCount < totalChunks) {
-                    const coord = chunkCoords[loadedCount];
-                    const key = `${coord.x},${coord.z}`;
-                    
-                    document.getElementById('loading-status').innerText = `Baue Chunk [${coord.x}, ${coord.z}]...`;
-                    
-                    if (!game.chunks[key]) {
-                        game.chunks[key] = new Chunk(coord.x, coord.z);
-                        game.chunks[key].rebuildMesh();
-                        scene.add(game.chunks[key].group);
+                try {
+                    if (loadedCount < totalChunks) {
+                        const coord = chunkCoords[loadedCount];
+                        const key = `${coord.x},${coord.z}`;
+                        
+                        document.getElementById('loading-status').innerText = `Baue Chunk [${coord.x}, ${coord.z}]...`;
+                        
+                        if (!game.chunks[key]) {
+                            game.chunks[key] = new Chunk(coord.x, coord.z);
+                            game.chunks[key].rebuildMesh();
+                            scene.add(game.chunks[key].group);
+                        }
+
+                        loadedCount++;
+                        const percent = Math.floor((loadedCount / totalChunks) * 100);
+                        document.getElementById('loading-bar-fill').style.width = `${percent}%`;
+                        document.getElementById('loading-percent').innerText = `${percent}%`;
+
+                        const elapsed = Date.now() - startTime;
+                        const timePerChunk = elapsed / loadedCount;
+                        const remaining = Math.ceil(((totalChunks - loadedCount) * timePerChunk) / 1000);
+                        document.getElementById('loading-eta').innerText = `Geschätzte Zeit: ${remaining}s`;
+
+                        setTimeout(loadNextChunk, 0);
+                    } else {
+                        document.getElementById('loading-status').innerText = "Initialisiere Spieler...";
+                        
+                        const spawnX = 0;
+                        const spawnZ = 0;
+                        let spawnHeight = Math.max(SEA_LEVEL + 2, game.noiseGen.getHeight(spawnX, spawnZ) + 2.5);
+                        
+                        camera.position.set(spawnX, spawnHeight, spawnZ);
+                        player.velocity.set(0, 0, 0);
+
+                        // UI umschalten
+                        document.getElementById('generating-screen').classList.add('hidden');
+                        document.getElementById('canvas-container').classList.remove('hidden');
+                        document.getElementById('hud-container').classList.remove('hidden');
+                        document.getElementById('topleft-hud').classList.remove('hidden');
+                        document.getElementById('topright-hud').classList.remove('hidden');
+                        document.getElementById('chat-container').classList.remove('hidden');
+                        document.getElementById('crosshair').classList.remove('hidden');
+                        // Fix: Menü zusätzlich hier nochmal explizit verstecken (robust
+                        // gegen jede Reihenfolge/Timing-Problematik)
+                        menuOverlay.classList.add('hidden');
+
+                        game.isWorldLoaded = true;
+                        game.playerChunk = { x: 0, z: 0 };
+
+                        generateStatHUDBars();
+                        drawHotbar();
+
+                        // Eingabemodus jetzt aktivieren (Pointer Lock oder Touch)
+                        enterGameInputMode();
                     }
-
-                    loadedCount++;
-                    const percent = Math.floor((loadedCount / totalChunks) * 100);
-                    document.getElementById('loading-bar-fill').style.width = `${percent}%`;
-                    document.getElementById('loading-percent').innerText = `${percent}%`;
-
-                    // Zeitberechnung
-                    const elapsed = Date.now() - startTime;
-                    const timePerChunk = elapsed / loadedCount;
-                    const remaining = Math.ceil(((totalChunks - loadedCount) * timePerChunk) / 1000);
-                    document.getElementById('loading-eta').innerText = `Geschätzte Zeit: ${remaining}s`;
-
-                    // Gib dem Browser Zeit für UI-Updates
-                    setTimeout(loadNextChunk, 0);
-                } else {
-                    // Laden beendet
-                    document.getElementById('loading-status').innerText = "Initialisiere Spieler...";
-                    
-                    const spawnX = 0;
-                    const spawnZ = 0;
-                    let spawnHeight = Math.max(SEA_LEVEL + 2, game.noiseGen.getHeight(spawnX, spawnZ) + 2.5);
-                    
-                    camera.position.set(spawnX, spawnHeight, spawnZ);
-                    player.velocity.set(0, 0, 0);
-
-                    // UI umschalten
-                    document.getElementById('generating-screen').classList.add('hidden');
-                    document.getElementById('canvas-container').classList.remove('hidden');
-                    document.getElementById('hud-container').classList.remove('hidden');
-                    document.getElementById('topleft-hud').classList.remove('hidden');
-                    document.getElementById('topright-hud').classList.remove('hidden');
-                    document.getElementById('chat-container').classList.remove('hidden');
-                    document.getElementById('crosshair').classList.remove('hidden');
-
-                    container.requestPointerLock();
-                    game.isWorldLoaded = true;
-                    game.playerChunk = { x: 0, z: 0 };
-
-                    generateStatHUDBars();
-                    drawHotbar();
+                } catch (err) {
+                    console.error('Fehler beim Laden der Welt:', err);
+                    document.getElementById('loading-status').innerText = "Fehler beim Laden — versuche erneut...";
+                    setTimeout(loadNextChunk, 50);
                 }
             }
 
@@ -2354,14 +2564,14 @@
         refreshLobbyBtn.addEventListener('click', () => game.mpSession.fetchLobbies());
 
         resumeBtn.addEventListener('click', () => {
-            container.requestPointerLock();
+            enterGameInputMode();
         });
 
         optionsPauseBtn.addEventListener('click', () => {
-            showNotification("Nutze WASD zum Gehen, Leertaste zum Springen und C zum Fliegen!");
+            showNotification(isTouchDevice ? "Nutze den Joystick zum Gehen, SPRUNG zum Springen und FLUG zum Fliegen!" : "Nutze WASD zum Gehen, Leertaste zum Springen und C zum Fliegen!");
         });
 
-        quitBtn.addEventListener('click', () => {
+        function returnToMainMenu() {
             pauseOverlay.classList.add('hidden');
             document.getElementById('canvas-container').classList.add('hidden');
             document.getElementById('hud-container').classList.add('hidden');
@@ -2369,27 +2579,37 @@
             document.getElementById('topright-hud').classList.add('hidden');
             document.getElementById('chat-container').classList.add('hidden');
             document.getElementById('crosshair').classList.add('hidden');
-            
+            touchControlsEl.classList.remove('active');
+            document.getElementById('chat-container').classList.remove('touch-active-chat');
+            controls.isLocked = false;
+            game.isPaused = false;
+
             menuOverlay.classList.remove('hidden');
             game.isWorldLoaded = false;
-        });
+        }
 
+        quitBtn.addEventListener('click', returnToMainMenu);
+
+        // Pointer Lock Change (nur relevant für Desktop-Browser mit Pointer Lock Support)
         document.addEventListener('pointerlockchange', () => {
+            if (!supportsPointerLock) return; // Touch-Geräte steuern isLocked manuell
             if (document.pointerLockElement === container) {
                 controls.isLocked = true;
                 menuOverlay.classList.add('hidden');
                 pauseOverlay.classList.add('hidden');
+                game.isPaused = false;
                 closeInventory();
             } else {
                 controls.isLocked = false;
                 if (!game.inventoryOpen && !game.chatInputActive && game.playerHealth > 0 && game.isWorldLoaded) {
+                    game.isPaused = true;
                     pauseOverlay.classList.remove('hidden');
                 }
             }
         });
 
         document.addEventListener('mousemove', (e) => {
-            if (!controls.isLocked) return;
+            if (!controls.isLocked || isTouchDevice) return;
 
             const sens = 0.0022;
             controls.yaw   -= e.movementX * sens;
@@ -2399,6 +2619,20 @@
 
             camera.rotation.set(controls.pitch, controls.yaw, 0, 'YXZ');
         });
+
+        // Fix (iPad + Logitech/Hardware-Tastatur): Die Tasten-Listener liefen
+        // global auf 'window' OHNE zu prüfen, ob gerade ein Text-Eingabefeld
+        // fokussiert ist (z.B. Spielername/Welt-Seed im Hauptmenü oder das
+        // Mod-JSON-Textfeld). Wer dort z.B. "Steve" tippte, löste dabei
+        // gleichzeitig Spiel-Shortcuts aus (t=Chat, e/i=Inventar, c=Fliegen,
+        // f=Debug). Diese Hilfsfunktion erkennt fokussierte Eingabefelder und
+        // lässt Tastatureingaben dort normal durch, ohne Spiel-Shortcuts.
+        function isTypingInFormField() {
+            const el = document.activeElement;
+            if (!el) return false;
+            const tag = el.tagName;
+            return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || el.isContentEditable;
+        }
 
         window.addEventListener('keydown', (e) => {
             if (game.chatInputActive) {
@@ -2410,11 +2644,39 @@
                 return;
             }
 
+            // Menü-Eingabefelder (Spielername, Welt-Seed, Session-ID, Mod-JSON)
+            // sollen normal tippbar bleiben, ohne dass Buchstaben gleichzeitig
+            // Spiel-Shortcuts auslösen.
+            if (isTypingInFormField()) return;
+
+            // Solange keine Welt geladen ist und kein Inventar offen ist, gibt
+            // es nichts zu steuern - vermeidet versehentliche Shortcut-Auslösung
+            // während man z.B. noch im Hauptmenü mit der Tastatur navigiert.
+            if (!game.isWorldLoaded && !game.inventoryOpen) return;
+
             keys[e.code] = true;
 
-            if (e.code === 'Space') {
+            // Escape schließt Inventar/pausiert - Standardverhalten auf jeder
+            // Hardware-Tastatur (Logi/Magic Keyboard eingeschlossen).
+            if (e.code === 'Escape') {
+                if (game.inventoryOpen) {
+                    closeInventory();
+                    enterGameInputMode();
+                } else if (controls.isLocked) {
+                    exitGameInputMode(true);
+                }
+                return;
+            }
+
+            // Bewegungs-/Aktionstasten: Standard-Browserverhalten unterbinden
+            // (z.B. Leertaste/Pfeiltasten scrollen sonst die Seite, was auf
+            // iPad mit externer Tastatur besonders störend auffällt).
+            if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Tab'].includes(e.code)) {
+                e.preventDefault();
+            }
+
+            if (e.code === 'Space' && !e.repeat) {
                 const now = Date.now();
-                // Doppel-Jump Erkennung (innerhalb von 300ms)
                 if (now - (game.lastSpaceTime || 0) < 300) {
                     if (game_gamemodes[game.playerId] === 'creative') {
                         game.flyMode = !game.flyMode;
@@ -2426,18 +2688,18 @@
                 game.lastSpaceTime = now;
             }
 
-            if (e.code === 'KeyF' || e.code === 'F3') {
+            if ((e.code === 'KeyF' || e.code === 'F3') && !e.repeat) {
                 e.preventDefault();
                 game.debugActive = !game.debugActive;
                 document.getElementById('debug-screen').classList.toggle('hidden', !game.debugActive);
             }
 
-            if (e.code === 'KeyT') {
+            if (e.code === 'KeyT' && !e.repeat) {
                 e.preventDefault();
                 openChat();
             }
 
-            if (e.code.startsWith('Digit')) {
+            if (e.code.startsWith('Digit') && !e.repeat) {
                 const digitNum = parseInt(e.code.replace('Digit', ''));
                 if (digitNum >= 1 && digitNum <= 9) {
                     const slotIdx = digitNum - 1;
@@ -2450,17 +2712,17 @@
                 }
             }
 
-            if (e.code === 'KeyE' || e.code === 'KeyI') {
+            if ((e.code === 'KeyE' || e.code === 'KeyI') && !e.repeat) {
                 if (controls.isLocked) {
-                    document.exitPointerLock();
+                    if (supportsPointerLock) document.exitPointerLock();
                     openInventory();
                 } else if (game.inventoryOpen) {
                     closeInventory();
-                    container.requestPointerLock();
+                    enterGameInputMode();
                 }
             }
 
-            if (e.code === 'KeyC') {
+            if (e.code === 'KeyC' && !e.repeat) {
                 game.flyMode = !game.flyMode;
                 showNotification(`Flugmodus: ${game.flyMode ? "AKTIV" : "DEAKTIVIERT"}`);
                 updateStatDisplay();
@@ -2481,6 +2743,13 @@
             controls.moveRight    = false;
             controls.jump         = false;
             controls.flyDown      = false;
+            touchState.forward = false;
+            touchState.backward = false;
+            touchState.left = false;
+            touchState.right = false;
+            touchState.jump = false;
+            touchState.flyDown = false;
+            game.isMouseDown = false;
         };
 
         window.addEventListener('blur', resetInputState);
@@ -2504,18 +2773,19 @@
         });
 
         function updateMovementKeys() {
-            controls.moveForward  = keys['KeyW'] || keys['ArrowUp'];
-            controls.moveBackward = keys['KeyS'] || keys['ArrowDown'];
-            controls.moveLeft     = keys['KeyA'] || keys['ArrowLeft'];
-            controls.moveRight    = keys['KeyD'] || keys['ArrowRight'];
-            controls.jump         = keys['Space'];
-            controls.flyDown      = keys['ShiftLeft'] || keys['ShiftRight'];
+            // Fix (iPad/Mobile): Tastatur- UND Touch-Eingaben werden kombiniert
+            controls.moveForward  = keys['KeyW'] || keys['ArrowUp'] || touchState.forward;
+            controls.moveBackward = keys['KeyS'] || keys['ArrowDown'] || touchState.backward;
+            controls.moveLeft     = keys['KeyA'] || keys['ArrowLeft'] || touchState.left;
+            controls.moveRight    = keys['KeyD'] || keys['ArrowRight'] || touchState.right;
+            controls.jump         = keys['Space'] || touchState.jump;
+            controls.flyDown      = keys['ShiftLeft'] || keys['ShiftRight'] || touchState.flyDown;
         }
 
         // --- PHYSIK ---
         const player = {
             velocity:   new THREE.Vector3(),
-            dimensions: { width: 0.6, height: 1.8, depth: 0.6 }, // Standard 1.8 Blöcke hoch (passt in 2-Block Lücken)
+            dimensions: { width: 0.6, height: 1.8, depth: 0.6 },
             onGround:     false,
             speed:        0.11,
             flySpeed:     0.22,
@@ -2577,6 +2847,7 @@
 
         function handlePlayerPhysics() {
             if (game.playerHealth <= 0 && !game.flyMode) return;
+            if (game.isPaused) return;
 
             if (controls.isLocked) {
                 updateMovementKeys();
@@ -2610,7 +2881,6 @@
             const isInsideWater  = currentBlockId === 14;
             const isInsideLava   = currentBlockId === 15;
 
-            // Ambient Sound Update basierend auf Biom
             if (chunkUpdateTick % 60 === 0) {
                 const currentBiome = game.noiseGen.getBiome(px, pz);
                 AudioEngine.updateAmbient(currentBiome.name);
@@ -2717,7 +2987,7 @@
         }
 
         function updateMining() {
-            if (!game.isMouseDown || game.playerHealth <= 0) {
+            if (!game.isMouseDown || game.playerHealth <= 0 || game.isPaused) {
                 game.miningTarget = null;
                 game.miningProgress = 0;
                 crackMesh.material.opacity = 0;
@@ -2749,7 +3019,6 @@
                 game.miningProgress = 0;
             }
 
-            // Mining Progress berechnen (Delta Time ca. 16ms bei 60fps)
             const miningSpeed = 1 / (blockDef.miningTime * 60); 
             game.miningProgress += miningSpeed;
 
@@ -2773,7 +3042,6 @@
             const mats = getBlockMaterials(blockDef);
             const mesh = new THREE.Mesh(geometry, mats);
             
-            // Position leicht zufällig versetzen
             mesh.position.set(pos.x, pos.y, pos.z);
             scene.add(mesh);
             
@@ -2783,12 +3051,14 @@
                 spawnTime: Date.now()
             });
         }
+    </script>
 
+    <script>
         // --- MOB SYSTEM ---
         const MOB_DEFINITIONS = {
             'zombie': {
                 health: 20,
-                size: [0.6, 1.8, 0.6], // w, h, d
+                size: [0.6, 1.8, 0.6],
                 colors: { head: 0x008800, body: 0x00aa00, limb: 0x006600 },
                 speed: 0.035,
                 damage: 2,
@@ -2815,10 +3085,9 @@
             }
         };
 
-        // --- MOB SYSTEM ---
         class Mob {
             constructor(type, x, z) {
-                this.type = type; // 'zombie', 'schwein', 'kuh'
+                this.type = type;
                 this.def = MOB_DEFINITIONS[type];
                 this.health = this.def.health;
                 this.size = this.def.size;
@@ -2826,7 +3095,7 @@
                 this.group = new THREE.Group();
                 this.createVisuals();
 
-                let spawnY = 0; // Nur eine Deklaration
+                let spawnY = 0;
                 for (let y_check = CHUNK_HEIGHT - 1; y_check >= 0; y_check--) {
                     const blockId = getGlobalBlock(x, y_check, z);
                     if (blockId > 0 && blockId !== 14) { 
@@ -2844,7 +3113,7 @@
                 this.isWalking = false;
                 this.velocity = new THREE.Vector3();
                 this.lastBurnTime = 0;
-                this.mixer = null; // Für Animationen
+                this.mixer = null;
             }
 
             createVisuals() {
@@ -2852,7 +3121,6 @@
                 const colors = this.def.colors;
 
                 if (this.type === 'zombie') {
-                    // Platzhalter Box solange Modell lädt
                     const placeholder = new THREE.Mesh(
                         new THREE.BoxGeometry(0.6, 1.8, 0.6), 
                         new THREE.MeshStandardMaterial({ color: 0x00aa00, transparent: true, opacity: 0.5 })
@@ -2860,18 +3128,15 @@
                     this.group.add(placeholder);
                     this.mesh = placeholder;
 
-                    // Lade das .glb Modell
                     gltfLoader.load('./mobs/zombie.glb', (gltf) => {
                         this.group.remove(placeholder);
                         const model = gltf.scene;
-                        // Auto-scale das Modell so, dass die Höhe zur `this.size[1]` passt
                         const bbox = new THREE.Box3().setFromObject(model);
                         const sizeVec = new THREE.Vector3();
                         bbox.getSize(sizeVec);
                         const targetHeight = this.size[1] || 1.8;
                         const uniformScale = sizeVec.y > 0 ? (targetHeight / sizeVec.y) : 1.0;
                         model.scale.setScalar(uniformScale * 0.98);
-                        // Zentriere Modell an den Boden (Gruppen-Position verwendet bereits die halbe Höhe)
                         model.position.y = - (sizeVec.y * model.scale.y) / 2;
                         this.group.add(model);
 
@@ -2880,10 +3145,8 @@
                             if (child.isMesh) child.userData.mob = this;
                         });
 
-                        // Animationen: robusterer Umgang mit mehreren Clips
                         if (gltf.animations && gltf.animations.length > 0) {
                             this.mixer = new THREE.AnimationMixer(model);
-                            // Suche bevorzugt nach einem 'Walk' oder 'Run' Clip, ansonsten erstes Clip nutzen
                             let walkClip = gltf.animations.find(a => /walk|run|idle/i.test(a.name)) || gltf.animations[0];
                             try {
                                 const action = this.mixer.clipAction(walkClip);
@@ -2894,6 +3157,9 @@
                                 console.warn('Animation konnte nicht abgespielt werden', e);
                             }
                         }
+                    }, undefined, () => {
+                        // Modell fehlt -> Platzhalter bleibt sichtbar (kein Absturz)
+                        placeholder.material.opacity = 1;
                     });
                 } else if (this.type === 'schwein') {
                     const mainMat = new THREE.MeshStandardMaterial({ color: colors.body, roughness: 0.8, metalness: 0.05 });
@@ -2946,7 +3212,7 @@
                     }
                     this.mesh = body;
                 }
-                if (this.mesh) this.mesh.userData.mob = this; // Referenz zum Mob-Objekt
+                if (this.mesh) this.mesh.userData.mob = this;
             }
 
             canStandAt(position) {
@@ -2970,7 +3236,7 @@
                 const now = Date.now();
 
                 if (this.mixer) {
-                    this.mixer.update(0.016); // Animationen updaten
+                    this.mixer.update(0.016);
                     if (this.animAction) {
                         this.animAction.timeScale = this.isWalking ? 1.2 : 0.6;
                     }
@@ -2985,9 +3251,7 @@
                     return false;
                 };
 
-                // Zombie-Verhalten
                 if (this.type === 'zombie') {
-                    // Tagsüber verbrennen
                     if (isDay) {
                         const headY = this.group.position.y + this.size[1] / 2;
                         if (isExposedToSky(this.group.position.x, headY + 0.5, this.group.position.z)) {
@@ -2997,7 +3261,6 @@
                             }
                         }
                     }
-                    // Aggro-Verhalten
                     if (dist < this.def.aggroRange) {
                         this.isWalking = true;
                         const dir = camera.position.clone().sub(this.group.position);
@@ -3007,18 +3270,16 @@
                             this.group.rotation.y += Math.PI * 0.4;
                         }
                         this.group.lookAt(camera.position.x, this.group.position.y, camera.position.z);
-                        if (dist < 1.4) takeDamage(this.def.damage); // Zombie attack
+                        if (dist < 1.4) takeDamage(this.def.damage);
                     }
                 }
                 
-                // KI Zustandswechsel (Drehen/Laufen/Warten)
                 if (now > this.nextStateChange) {
                     this.isWalking = Math.random() > 0.4;
                     this.group.rotation.y = Math.random() * Math.PI * 2;
                     this.nextStateChange = now + 1000 + Math.random() * 4000;
                 }
 
-                // Bewegung für passive Mobs oder Zombies außer Reichweite
                 if (this.isWalking && (this.type !== 'zombie' || dist >= this.def.aggroRange)) {
                     const forward = new THREE.Vector3(0,0,1).applyQuaternion(this.group.quaternion);
                     if (!tryMove(forward)) {
@@ -3030,13 +3291,12 @@
                 const gy = game.noiseGen.getHeight(this.group.position.x, this.group.position.z);
                 if (this.group.position.y < gy) this.group.position.y = gy;
                 else if (this.group.position.y > gy) this.group.position.y -= 0.1;
-                // Einfache Gravitation (kein Snapping mehr, wichtig für Höhlen!)
                 const bx = Math.floor(this.group.position.x);
                 const by = Math.floor(this.group.position.y - this.size[1]/2);
                 const bz = Math.floor(this.group.position.z);
                 const blockBelow = getGlobalBlock(bx, by - 1, bz);
                 if (blockBelow === 0 || blockBelow === 14) {
-                    this.group.position.y -= 0.1; // Fallen
+                    this.group.position.y -= 0.1;
                 }
             }
 
@@ -3058,8 +3318,7 @@
         }
 
         function breakBlock(pos, blockId) {
-            // Spawne das Item in der Welt statt es direkt ins Inventar zu legen
-            if (blockId > 0 && blockId !== 14 && blockId !== 15 && blockId !== 13) { // TNT droppt nicht
+            if (blockId > 0 && blockId !== 14 && blockId !== 15 && blockId !== 13) {
                 spawnDroppedItem(pos, blockId);
             }
 
@@ -3072,7 +3331,7 @@
                 let flash = false;
                 const flashInt = setInterval(() => {
                     flash = !flash;
-                    tntMesh.material.color.setHex(flash ? 0xff0000 : 0xffffff); // Rot-Weiß Blinken
+                    tntMesh.material.color.setHex(flash ? 0xff0000 : 0xffffff);
                     tntMesh.scale.setScalar(flash ? 1.15 : 1.0);
                 }, 250);
 
@@ -3080,8 +3339,7 @@
                     clearInterval(flashInt);
                     scene.remove(tntMesh);
                     triggerTNTExplosion(pos);
-                    triggerTNTExplosion(pos.clone());
-                }, 2000); // 2 Sekunden bis Explosion
+                }, 2000);
             } else {
                 setGlobalBlock(pos.x, pos.y, pos.z, 0);
                 AudioEngine.playHit(blockId);
@@ -3178,79 +3436,88 @@
             armMesh.position.z = -0.5 + Math.sin(swingTimer) * 0.25;
         }
 
+        // Fix: Block-Platzieren wurde aus dem rechten Mausklick in eine eigene
+        // Funktion ausgelagert, damit sowohl Rechtsklick (Desktop) als auch der
+        // Touch-"BAUEN"-Button (iPad/Mobile) dieselbe Logik nutzen können.
+        function placeBlockAtCrosshair() {
+            const target = updateRaycast(true);
+            if (!target) return;
+
+            const targetedBlockId = getGlobalBlock(target.worldPos.x, target.worldPos.y, target.worldPos.z);
+            let px, py, pz;
+
+            if (targetedBlockId === 14) {
+                px = target.worldPos.x;
+                py = target.worldPos.y;
+                pz = target.worldPos.z;
+            } else {
+                const norm = target.normal;
+                px = target.worldPos.x + norm.x;
+                py = target.worldPos.y + norm.y;
+                pz = target.worldPos.z + norm.z;
+            }
+
+            const hw = player.dimensions.width  / 2;
+            const hh = player.dimensions.height;
+            const hd = player.dimensions.depth  / 2;
+            
+            const playerBox = new THREE.Box3(
+                new THREE.Vector3(camera.position.x - hw, camera.position.y - EYE_LEVEL,      camera.position.z - hd),
+                new THREE.Vector3(camera.position.x + hw, camera.position.y - EYE_LEVEL + hh, camera.position.z + hd)
+            );
+            const blockBox = new THREE.Box3(
+                new THREE.Vector3(px - 0.5, py - 0.5, pz - 0.5),
+                new THREE.Vector3(px + 0.5, py + 0.5, pz + 0.5)
+            );
+
+            if (!playerBox.intersectsBox(blockBox)) {
+                ensureSelectedHotbarSlotValid();
+                const slot = game.inventorySlots[game.activeBlockIndex] || { blockId: 0, count: 0 };
+                const blockId = slot.blockId;
+                const quantityAvailable = slot.count;
+
+                if ((quantityAvailable > 0 && blockId > 0) || game.flyMode) {
+                    if (!game.flyMode) {
+                        slot.count -= 1;
+                        if (slot.count <= 0) {
+                            slot.blockId = 0;
+                            slot.count = 0;
+                        }
+                    }
+                    if (blockId > 0) {
+                        setGlobalBlock(px, py, pz, blockId);
+                        AudioEngine.playPlace();
+                    } else {
+                        showNotification('Kein gültiger Block ausgewählt. Wähle einen anderen Slot.');
+                    }
+                    drawHotbar();
+                } else {
+                    showNotification(`Keine Blöcke in diesem Slot übrig!`);
+                }
+            }
+        }
+
+        function mineOrHitAtCrosshair() {
+            triggerSwing();
+            const mob = updateMobRaycast();
+            if (mob) {
+                if (mob.takeDamage(6)) {
+                    game.activeMobs = game.activeMobs.filter(m => m !== mob);
+                }
+                return true;
+            }
+            return false;
+        }
+
         window.addEventListener('mousedown', (e) => {
-            if (!controls.isLocked || game.playerHealth <= 0) return;
+            if (!controls.isLocked || game.playerHealth <= 0 || isTouchDevice) return;
 
             if (e.button === 0) {
                 game.isMouseDown = true;
-                triggerSwing();
-                
-                const mob = updateMobRaycast();
-                if (mob) {
-                    if (mob.takeDamage(6)) {
-                        game.activeMobs = game.activeMobs.filter(m => m !== mob);
-                    }
-                    return;
-                }
+                mineOrHitAtCrosshair();
             } else if (e.button === 2) {
                 triggerSwing();
-                const target = updateRaycast();
-                if (target) {
-                    const targetedBlockId = getGlobalBlock(target.worldPos.x, target.worldPos.y, target.worldPos.z);
-                    let px, py, pz;
-
-                    if (targetedBlockId === 14) {
-                        // Wasser durch Block ersetzen
-                        px = target.worldPos.x;
-                        py = target.worldPos.y;
-                        pz = target.worldPos.z;
-                    } else {
-                        // Normal an den Block anbauen
-                        const norm = target.normal;
-                        px = target.worldPos.x + norm.x;
-                        py = target.worldPos.y + norm.y;
-                        pz = target.worldPos.z + norm.z;
-                    }
-
-                    const hw = player.dimensions.width  / 2;
-                    const hh = player.dimensions.height;
-                    const hd = player.dimensions.depth  / 2;
-                    
-                    const playerBox = new THREE.Box3(
-                        new THREE.Vector3(camera.position.x - hw, camera.position.y - EYE_LEVEL,      camera.position.z - hd),
-                        new THREE.Vector3(camera.position.x + hw, camera.position.y - EYE_LEVEL + hh, camera.position.z + hd)
-                    );
-                    const blockBox = new THREE.Box3(
-                        new THREE.Vector3(px - 0.5, py - 0.5, pz - 0.5),
-                        new THREE.Vector3(px + 0.5, py + 0.5, pz + 0.5)
-                    );
-
-                    if (!playerBox.intersectsBox(blockBox)) {
-                        ensureSelectedHotbarSlotValid();
-                        const slot = game.inventorySlots[game.activeBlockIndex] || { blockId: 0, count: 0 };
-                        const blockId = slot.blockId;
-                        const quantityAvailable = slot.count;
-
-                        if ((quantityAvailable > 0 && blockId > 0) || game.flyMode) {
-                            if (!game.flyMode) {
-                                slot.count -= 1;
-                                if (slot.count <= 0) {
-                                    slot.blockId = 0;
-                                    slot.count = 0;
-                                }
-                            }
-                            if (blockId > 0) {
-                                setGlobalBlock(px, py, pz, blockId);
-                                AudioEngine.playPlace();
-                            } else {
-                                showNotification('Kein gültiger Block ausgewählt. Wähle einen anderen Slot.');
-                            }
-                            drawHotbar();
-                        } else {
-                            showNotification(`Keine Blöcke in diesem Slot übrig!`);
-                        }
-                    }
-                }
+                placeBlockAtCrosshair();
             }
         });
 
@@ -3259,13 +3526,14 @@
         });
 
         window.addEventListener('contextmenu', e => e.preventDefault());
+    </script>
 
+    <script>
         // --- SCHADEN & LEBEN ---
         function takeDamage(amount) {
             const now = Date.now();
             const isCreative = game_gamemodes[game.playerId] === 'creative';
             
-            // Minecraft Invincibility Frames (ca. 0.5s Cooldown)
             if (isCreative || game.flyMode || game.playerHealth <= 0 || now - game.lastDamageTime < 500) return;
 
             const difficultyFactor = game.difficulty === 'Friedlich' ? 0.6 : game.difficulty === 'Schwer' ? 1.35 : 1.0;
@@ -3285,7 +3553,6 @@
                 }, 100);
             }
             
-            // Rückstoß (Knockback) Simulation
             player.velocity.y = 0.1;
             camera.position.y += 0.05;
 
@@ -3299,7 +3566,8 @@
         const deathMenuBtn  = document.getElementById('btn-death-menu');
 
         function handleDeath() {
-            document.exitPointerLock();
+            if (supportsPointerLock) document.exitPointerLock();
+            controls.isLocked = false;
             deathOverlay.classList.remove('hidden');
         }
 
@@ -3313,26 +3581,17 @@
             camera.position.set(0, spawnHeight, 0);
             player.velocity.set(0, 0, 0);
 
-            container.requestPointerLock();
+            enterGameInputMode();
         });
 
         deathMenuBtn.addEventListener('click', () => {
             deathOverlay.classList.add('hidden');
-            document.getElementById('canvas-container').classList.add('hidden');
-            document.getElementById('hud-container').classList.add('hidden');
-            document.getElementById('topleft-hud').classList.add('hidden');
-            document.getElementById('topright-hud').classList.add('hidden');
-            document.getElementById('chat-container').classList.add('hidden');
-            document.getElementById('crosshair').classList.add('hidden');
-            
-            menuOverlay.classList.remove('hidden');
-            game.isWorldLoaded = false;
+            returnToMainMenu();
         });
 
         function triggerTNTExplosion(pos) {
             AudioEngine.playExplosion(pos);
             
-            // Schaden an Spieler
             const dist = camera.position.distanceTo(pos);
             if (dist < 6) {
                 const dmg = Math.floor((1 - dist / 6) * 18) + 2;
@@ -3355,7 +3614,7 @@
 
         // --- TAG & NACHTZYKLUS ---
         function updateDayNightCycle() {
-            game.timeOfDay += 0.00000694; // 24 Minuten Zyklus (12 Min Tag, 12 Min Nacht)
+            game.timeOfDay += 0.00000694;
             if (game.timeOfDay > 1) game.timeOfDay = 0;
 
             const angle     = game.timeOfDay * Math.PI * 2;
@@ -3363,35 +3622,29 @@
             const orbitDist = 400;
 
             let skyColor = new THREE.Color(0x88c6ff);
-            // Tages-Interpolation: Tag > Dämmerung > Nacht
             if (sineAngle > 0.15) {
-                // Tag
                 const t = Math.min(1, (sineAngle - 0.15) / (1 - 0.15));
                 skyColor.lerpColors(new THREE.Color(0xffeebb), new THREE.Color(0x88c6ff), t);
                 updateStatTimeUI("Tag", "#ffd700");
-                // weniger Nebel tagsüber
                 scene.fog.density = 0.002 + (1 - t) * 0.002;
-                ambientLight.intensity = 0.45 + t * 0.5;
+                ambientLight.intensity = 0.5 + t * 0.55;
             } else if (sineAngle > -0.15) {
-                // Dämmerung
                 const t = Math.min(1, (sineAngle + 0.15) / (0.3));
                 skyColor = new THREE.Color(0xffb78a).lerp(new THREE.Color(0x6e89b8), t);
                 updateStatTimeUI("Dämmerung", "#ffa500");
                 scene.fog.density = 0.01;
-                ambientLight.intensity = 0.25 + t * 0.25;
+                ambientLight.intensity = 0.3 + t * 0.25;
             } else {
-                // Nacht
                 skyColor = new THREE.Color(0x061029);
                 updateStatTimeUI("Nacht", "#60a5fa");
                 scene.fog.density = 0.02;
-                ambientLight.intensity = 0.08;
+                ambientLight.intensity = 0.14;
             }
 
             scene.background = skyColor;
             scene.fog.color  = skyColor;
             renderer.setClearColor(skyColor);
 
-            // Sterne
             if (sineAngle < -0.15) {
                 starsMesh.visible          = true;
                 starsMesh.material.opacity = Math.min(1, (-sineAngle - 0.15) * 2.5);
@@ -3401,19 +3654,16 @@
             }
             starsMesh.position.copy(camera.position);
 
-            // Sonne
             const sunX = Math.sin(angle) * orbitDist;
             const sunY = Math.cos(angle) * orbitDist;
             sunMesh.position.set(camera.position.x + sunX, sunY, camera.position.z);
             sunMesh.lookAt(camera.position.x, 0, camera.position.z);
 
-            // Mond
             const moonX = Math.sin(angle + Math.PI) * orbitDist;
             const moonY = Math.cos(angle + Math.PI) * orbitDist;
             moonMesh.position.set(camera.position.x + moonX, moonY, camera.position.z);
             moonMesh.lookAt(camera.position.x, 0, camera.position.z);
 
-            // Wolken
             cloudGroup.position.x = camera.position.x;
             cloudGroup.position.z = camera.position.z;
             clouds.forEach(c => {
@@ -3421,23 +3671,19 @@
                 if (c.position.x > 300) c.position.x = -300;
             });
 
-            // Lichtstärke & -farbe für Sonne/Mond
             if (sineAngle > 0.15) {
-                // Tag: warme Sonne
                 const sunStrength = 0.9 + (Math.sin(angle) * 0.1);
                 dirLight.intensity = sunStrength;
                 dirLight.color.setHex(0xfff1d0);
                 moonLight.intensity = 0.0;
             } else if (sineAngle > -0.15) {
-                // Dämmerung: weiches, leicht orangenes Licht
                 dirLight.intensity = 0.45;
                 dirLight.color.setHex(0xffc28a);
                 moonLight.intensity = 0.02;
             } else {
-                // Nacht: Mondlicht als primärer Richtungs-Lichtgeber (kühl)
-                dirLight.intensity = 0.08;
+                dirLight.intensity = 0.1;
                 dirLight.color.setHex(0x6f8fb8);
-                moonLight.intensity = 0.12;
+                moonLight.intensity = 0.15;
                 moonLight.color.setHex(0xa8c4ff);
             }
             dirLight.position.set(sunX, sunY, 50);
@@ -3446,7 +3692,7 @@
 
         function checkUnderwater() {
             const px = Math.floor(camera.position.x);
-            const py = Math.floor(camera.position.y); // Kopf-Position
+            const py = Math.floor(camera.position.y);
             const pz = Math.floor(camera.position.z);
             const headBlockId = getGlobalBlock(px, py, pz);
             
@@ -3457,7 +3703,6 @@
                 scene.fog.density = 0.12 + (depth * 0.015);
                 overlay.classList.remove('hidden');
             } else {
-                // Nebelfarbe wird in updateDayNightCycle gesetzt
                 scene.fog.density = 0.025;
                 overlay.classList.add('hidden');
             }
@@ -3840,9 +4085,11 @@
 
         document.getElementById('btn-inventory-close').addEventListener('click', () => {
             closeInventory();
-            container.requestPointerLock();
+            enterGameInputMode();
         });
+    </script>
 
+    <script>
         // --- CHAT ---
         const chatMessages = document.getElementById('chat-messages');
         const chatInput    = document.getElementById('chat-input');
@@ -3850,14 +4097,14 @@
         function openChat() {
             game.chatInputActive = true;
             chatInput.focus();
-            document.exitPointerLock();
+            if (supportsPointerLock) document.exitPointerLock();
         }
 
         function closeChat() {
             game.chatInputActive = false;
             chatInput.value = '';
             chatInput.blur();
-            container.requestPointerLock();
+            enterGameInputMode();
         }
 
         function sendChatMessage() {
@@ -3947,7 +4194,6 @@
                     }
                 }
             } else if (cmd === 'teleport' || cmd === 'tp') {
-                // Aktuelle Position als Basis (falls nur x, y oder z angegeben wird)
                 let tx = camera.position.x;
                 let ty = camera.position.y - EYE_LEVEL;
                 let tz = camera.position.z;
@@ -3963,7 +4209,7 @@
                 });
 
                 camera.position.set(tx, ty + EYE_LEVEL, tz);
-                player.velocity.set(0, 0, 0); // Momentum stoppen
+                player.velocity.set(0, 0, 0);
                 showNotification(`Teleportiert zu: X:${tx.toFixed(1)} Y:${ty.toFixed(1)} Z:${tz.toFixed(1)}`);
                 addChatMessage(`<span class="text-gray-400 italic">Teleportiert zu ${tx.toFixed(1)}, ${ty.toFixed(1)}, ${tz.toFixed(1)}</span>`, true);
             }
@@ -4092,33 +4338,199 @@
 
         function updateDroppedItems() {
             const now = Date.now();
-            const DESPAWN_TIME = 300000; // 5 Minuten in ms
+            const DESPAWN_TIME = 300000;
 
             for (let i = game.droppedItems.length - 1; i >= 0; i--) {
                 const item = game.droppedItems[i];
                 
-                // Despawn Check (5 Minuten)
                 if (now - item.spawnTime > DESPAWN_TIME) {
                     scene.remove(item.mesh);
                     game.droppedItems.splice(i, 1);
                     continue;
                 }
 
-                // Animation: Drehen und leichtes Schweben
                 item.mesh.rotation.y += 0.04;
                 item.mesh.position.y += Math.sin(now * 0.005) * 0.0015;
                 
-                // Distanz-Check zum Einsammeln (1.5 Blöcke Radius)
                 const dist = camera.position.distanceTo(item.mesh.position);
                 if (dist < 1.5 && now - item.spawnTime > 600) {
                     addItemToInventory(item.blockId, 1);
                     scene.remove(item.mesh);
                     game.droppedItems.splice(i, 1);
-                    AudioEngine.playPlace(); // Pickup Sound
+                    AudioEngine.playPlace();
                 }
             }
         }
+    </script>
 
+    <script>
+        // ==========================================================
+        // TOUCH CONTROLS (Fix: iPad / Mobile Steuerung)
+        // Ohne dies gab es auf iPad/Touch-Geräten überhaupt keine
+        // Möglichkeit, sich zu bewegen, umzusehen, abzubauen oder zu
+        // bauen - Pointer Lock und Maus-Events existieren dort nicht.
+        // ==========================================================
+        (function setupTouchControls() {
+            const joystickZone = document.getElementById('touch-joystick-zone');
+            const joystickKnob = document.getElementById('touch-joystick-knob');
+            const lookZone     = document.getElementById('touch-look-zone');
+            const btnJump      = document.getElementById('touch-btn-jump');
+            const btnMine      = document.getElementById('touch-btn-mine');
+            const btnPlace     = document.getElementById('touch-btn-place');
+            const btnInventory = document.getElementById('touch-btn-inventory');
+            const btnFly       = document.getElementById('touch-btn-fly');
+            const btnPause     = document.getElementById('touch-btn-pause');
+
+            let joystickTouchId = null;
+            let joystickCenter = { x: 0, y: 0 };
+            const joystickRadius = 45;
+
+            joystickZone.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                const touch = e.changedTouches[0];
+                joystickTouchId = touch.identifier;
+                const rect = joystickZone.getBoundingClientRect();
+                joystickCenter = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+            }, { passive: false });
+
+            joystickZone.addEventListener('touchmove', (e) => {
+                e.preventDefault();
+                for (const touch of e.changedTouches) {
+                    if (touch.identifier !== joystickTouchId) continue;
+                    let dx = touch.clientX - joystickCenter.x;
+                    let dy = touch.clientY - joystickCenter.y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    if (dist > joystickRadius) {
+                        dx = (dx / dist) * joystickRadius;
+                        dy = (dy / dist) * joystickRadius;
+                    }
+                    joystickKnob.style.left = `${35 + dx}px`;
+                    joystickKnob.style.top  = `${35 + dy}px`;
+
+                    const threshold = 12;
+                    touchState.forward  = dy < -threshold;
+                    touchState.backward = dy > threshold;
+                    touchState.left     = dx < -threshold;
+                    touchState.right    = dx > threshold;
+                }
+            }, { passive: false });
+
+            function resetJoystick(e) {
+                for (const touch of e.changedTouches) {
+                    if (touch.identifier !== joystickTouchId) continue;
+                    joystickTouchId = null;
+                    joystickKnob.style.left = '35px';
+                    joystickKnob.style.top = '35px';
+                    touchState.forward = false;
+                    touchState.backward = false;
+                    touchState.left = false;
+                    touchState.right = false;
+                }
+            }
+            joystickZone.addEventListener('touchend', resetJoystick, { passive: false });
+            joystickZone.addEventListener('touchcancel', resetJoystick, { passive: false });
+
+            // Look-Zone: Fingerbewegung dreht die Kamera (wie Mausbewegung)
+            let lookTouchId = null;
+            let lastLookX = 0, lastLookY = 0;
+
+            lookZone.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                if (lookTouchId !== null) return;
+                const touch = e.changedTouches[0];
+                lookTouchId = touch.identifier;
+                lastLookX = touch.clientX;
+                lastLookY = touch.clientY;
+            }, { passive: false });
+
+            lookZone.addEventListener('touchmove', (e) => {
+                e.preventDefault();
+                if (!controls.isLocked) return;
+                for (const touch of e.changedTouches) {
+                    if (touch.identifier !== lookTouchId) continue;
+                    const dx = touch.clientX - lastLookX;
+                    const dy = touch.clientY - lastLookY;
+                    lastLookX = touch.clientX;
+                    lastLookY = touch.clientY;
+
+                    const sens = 0.0042;
+                    controls.yaw   -= dx * sens;
+                    controls.pitch -= dy * sens;
+                    controls.pitch = Math.max(-Math.PI / 2 + 0.1, Math.min(Math.PI / 2 - 0.1, controls.pitch));
+                    camera.rotation.set(controls.pitch, controls.yaw, 0, 'YXZ');
+                }
+            }, { passive: false });
+
+            function releaseLook(e) {
+                for (const touch of e.changedTouches) {
+                    if (touch.identifier === lookTouchId) lookTouchId = null;
+                }
+            }
+            lookZone.addEventListener('touchend', releaseLook, { passive: false });
+            lookZone.addEventListener('touchcancel', releaseLook, { passive: false });
+
+            // Sprung-Button
+            btnJump.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                touchState.jump = true;
+                const now = Date.now();
+                if (now - (game.lastSpaceTime || 0) < 300 && game_gamemodes[game.playerId] === 'creative') {
+                    game.flyMode = !game.flyMode;
+                    showNotification(`Flugmodus: ${game.flyMode ? "AN" : "AUS"}`);
+                    updateStatDisplay();
+                }
+                game.lastSpaceTime = now;
+            }, { passive: false });
+            btnJump.addEventListener('touchend', (e) => { e.preventDefault(); touchState.jump = false; }, { passive: false });
+            btnJump.addEventListener('touchcancel', (e) => { e.preventDefault(); touchState.jump = false; }, { passive: false });
+
+            // Abbau-Button (Mining) - nutzt dieselbe Logik wie Linksklick
+            btnMine.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                if (!controls.isLocked || game.playerHealth <= 0) return;
+                game.isMouseDown = true;
+                mineOrHitAtCrosshair();
+            }, { passive: false });
+            btnMine.addEventListener('touchend', (e) => { e.preventDefault(); game.isMouseDown = false; }, { passive: false });
+            btnMine.addEventListener('touchcancel', (e) => { e.preventDefault(); game.isMouseDown = false; }, { passive: false });
+
+            // Bauen-Button (Platzieren) - nutzt dieselbe Logik wie Rechtsklick
+            btnPlace.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                if (!controls.isLocked || game.playerHealth <= 0) return;
+                triggerSwing();
+                placeBlockAtCrosshair();
+            }, { passive: false });
+
+            // Inventar-Button
+            btnInventory.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                if (game.inventoryOpen) {
+                    closeInventory();
+                    enterGameInputMode();
+                } else {
+                    openInventory();
+                }
+            }, { passive: false });
+
+            // Flug-Button
+            btnFly.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                game.flyMode = !game.flyMode;
+                showNotification(`Flugmodus: ${game.flyMode ? "AKTIV" : "DEAKTIVIERT"}`);
+                updateStatDisplay();
+                AudioEngine.playJump();
+            }, { passive: false });
+
+            // Pause-Button
+            btnPause.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                exitGameInputMode(true);
+            }, { passive: false });
+        })();
+    </script>
+
+    <script>
         // --- ANIMATIONS SCHLEIFE ---
         function animate() {
             requestAnimationFrame(animate);
@@ -4142,7 +4554,6 @@
                 updatePositionDisplay();
                 updateDroppedItems();
 
-                // Mobs updaten
                 if (chunkUpdateTick % 2 === 0) {
                     game.activeMobs.forEach(m => m.update());
                 }
@@ -4151,7 +4562,6 @@
                     updateWaterPhysics();
                 }
 
-                // Mob Spawning Logik (wiederhergestellt)
                 if (Math.random() < 0.002 && game.activeMobs.length < 20) {
                     const spawnX = camera.position.x + (Math.random() - 0.5) * 64;
                     const spawnZ = camera.position.z + (Math.random() - 0.5) * 64;
@@ -4164,7 +4574,6 @@
                     const exposed = isExposedToSky(spawnX, surfaceY + 1, spawnZ);
                     const isInsideCave = !exposed;
 
-                    // Zombies spawnen nur nachts oder in dunklen Höhlen
                     if (selectedType === 'zombie' && !isNightTime && !isInsideCave) {
                         selectedType = mobTypes[Math.floor(Math.random() * (mobTypes.length - 1)) + 1];
                     }
@@ -4175,7 +4584,6 @@
                 }
             }
 
-            // Multiplayer Position synchronisieren (auch wenn nicht gelockt)
             if (game.isWorldLoaded && game.isMultiplayerActive && game.mpSession) {
                 game.mpSession.sendLocalPosition();
             }
@@ -4199,12 +4607,37 @@
             renderer.render(scene, camera);
         }
 
-        window.addEventListener('resize', () => {
-            camera.aspect = window.innerWidth / window.innerHeight;
+        // (getViewportSize ist bereits weiter oben definiert, direkt neben
+        // computeResponsiveFov, damit auch die initiale Kamera/Renderer-
+        // Erstellung sie nutzen kann.)
+
+        function handleViewportResize() {
+            const size = getViewportSize();
+            if (size.width < 10 || size.height < 10) return; // unplausibler Zwischenwert, ignorieren
+            camera.aspect = size.width / size.height;
+            camera.fov = computeResponsiveFov();
             camera.updateProjectionMatrix();
-            renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.25));
-            renderer.setSize(window.innerWidth, window.innerHeight, false);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2.0));
+            renderer.setSize(size.width, size.height, false);
+        }
+
+        window.addEventListener('resize', handleViewportResize);
+
+        // iOS/iPad: Adressleiste, Split-View, Stage-Manager-Fenstergröße oder
+        // Drehung ändern den Viewport nachträglich - erneut anpassen.
+        window.addEventListener('orientationchange', () => {
+            setTimeout(handleViewportResize, 300);
+            setTimeout(handleViewportResize, 800);
         });
+        if (window.visualViewport) {
+            window.visualViewport.addEventListener('resize', handleViewportResize);
+            window.visualViewport.addEventListener('scroll', handleViewportResize);
+        }
+
+        // Fix: Direkt nach dem Laden mehrfach nachmessen, falls Safari die
+        // finale Viewport-Größe erst nach ein paar hundert ms meldet
+        // (typisches iOS-Verhalten bei frischem Seitenaufruf / PWA-Start).
+        [0, 100, 300, 600, 1200].forEach(delay => setTimeout(handleViewportResize, delay));
 
         animate();
     </script>
