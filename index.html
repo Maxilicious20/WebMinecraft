@@ -194,7 +194,14 @@
             position: absolute;
             right: 0;
             top: 0;
-            bottom: 0;
+            /* Fix: Zone endet klar OBERHALB des Button-Clusters (Sprung/Abbau/
+               Bauen unten rechts), statt bis bottom:0 zu reichen. Vorher lag
+               die unsichtbare Look-Zone direkt UNTER den Buttons im selben
+               Bereich, was auf manchen iPadOS/WebKit-Versionen zu doppelt
+               ausgelösten Touch-Events (Button-Tap + Look-Drag gleichzeitig)
+               führte - dadurch riss die Kamera beim Tippen auf die Buttons
+               abrupt herum/nach unten (genau der gemeldete "Boden-Bug"). */
+            bottom: 220px;
             width: 55%;
             pointer-events: auto;
             touch-action: none;
@@ -261,8 +268,11 @@
             #touch-btn-fly { left: 96px; top: 24px; width: 60px; height: 60px; }
             #touch-btn-pause { right: 24px; top: 24px; width: 60px; height: 60px; }
             /* Look-Zone etwas schmaler auf großem Screen, damit mehr Platz für
-               Weltansicht bleibt und der Bereich nicht zu dominant ist */
-            #touch-look-zone { width: 45%; }
+               Weltansicht bleibt und der Bereich nicht zu dominant ist.
+               bottom-Wert an die größeren iPad-Buttons angepasst (Cluster
+               reicht bis ca. 256px von unten), damit die Zone die Buttons
+               weiterhin sauber ausspart. */
+            #touch-look-zone { width: 45%; bottom: 280px; }
             #topleft-hud { top: 24px; left: 24px; }
             #topright-hud { top: 24px; right: 24px; }
         }
@@ -1158,40 +1168,34 @@
         );
         scene.add(crackMesh);
 
-        // Fix: iOS Safari liefert window.innerWidth/innerHeight direkt nach dem
-        // Laden manchmal noch einen falschen Wert (siehe unten in
-        // handleViewportResize für Details). window.visualViewport ist auf iOS
-        // zuverlässiger und wird daher, wenn verfügbar, bevorzugt - auch schon
-        // bei der allerersten Kamera/Renderer-Erstellung.
+        // Fix: Die vorherige aspect-abhängige FOV-Berechnung konnte auf iPad
+        // bei ungewöhnlichen/instabilen visualViewport-Werten ein extrem
+        // verzerrtes vertikales FOV erzeugen (Kamera wirkte "schräg"/nach unten
+        // gekippt, Horizont lag nicht mehr waagerecht im Bild). Ein einfaches,
+        // FESTES vertikales FOV ist der Standard-Ansatz in Three.js-Ego-Shootern
+        // und verhält sich auf jedem Gerät vorhersehbar - kein "Zoomen" oder
+        // Kippen mehr, unabhängig vom Seitenverhältnis.
+        const FIXED_VERTICAL_FOV = 75;
+
         function getViewportSize() {
-            if (window.visualViewport) {
+            // Fix: window.visualViewport kann auf iOS beim allerersten Aufruf
+            // (vor dem ersten Layout-Tick) 0 oder einen unplausiblen Wert
+            // melden. Wir validieren daher und fallen sauber auf
+            // window.innerWidth/innerHeight zurück, wenn der Wert unbrauchbar ist.
+            if (window.visualViewport && window.visualViewport.width > 50 && window.visualViewport.height > 50) {
                 return {
                     width: window.visualViewport.width,
                     height: window.visualViewport.height
                 };
             }
-            return { width: window.innerWidth, height: window.innerHeight };
-        }
-
-        // Fix: FOV wird an das Seitenverhältnis angepasst. Ein fixes 70°-FOV auf
-        // schmalen Portrait-Screens (z.B. iPad Hochformat mit Chat/HUD-Overlay,
-        // oder hoher DPR) wirkt "reingezoomt". Wir rechnen ein horizontales FOV
-        // aus, das auf breiten Screens normal bleibt und auf schmalen/hohen
-        // Screens automatisch weiter wird (vertikales FOV wird angehoben).
-        function computeResponsiveFov() {
-            const size = getViewportSize();
-            const aspect = size.width / size.height;
-            const baseHorizontalFovDeg = 82; // gewünschtes horizontales Sichtfeld
-            const baseHorizontalFovRad = baseHorizontalFovDeg * Math.PI / 180;
-            let verticalFovRad = 2 * Math.atan(Math.tan(baseHorizontalFovRad / 2) / Math.max(aspect, 0.4));
-            let verticalFovDeg = verticalFovRad * 180 / Math.PI;
-            // Grenzen, damit es nie zu extrem/verzerrt wird
-            verticalFovDeg = Math.max(60, Math.min(100, verticalFovDeg));
-            return verticalFovDeg;
+            return {
+                width: window.innerWidth || document.documentElement.clientWidth || 800,
+                height: window.innerHeight || document.documentElement.clientHeight || 600
+            };
         }
 
         const _initialViewport = getViewportSize();
-        const camera = new THREE.PerspectiveCamera(computeResponsiveFov(), _initialViewport.width / _initialViewport.height, 0.1, 1000);
+        const camera = new THREE.PerspectiveCamera(FIXED_VERTICAL_FOV, _initialViewport.width / _initialViewport.height, 0.1, 1000);
         const renderer = new THREE.WebGLRenderer({ antialias: !isTouchDevice, alpha: false, powerPreference: "high-performance" });
         // Fix: Auf iPad mit hoher devicePixelRatio (2-3) sorgt ein zu hoher Cap
         // für unnötige Render-Last UND macht durch starkes Downsampling/UI-Skalierung
@@ -4547,6 +4551,14 @@
 
             handlePlayerPhysics();
 
+            // Sicherheitsnetz: Pitch/Yaw immer geklemmt halten und die
+            // Kamera-Rotation jeden Frame konsistent aus controls.pitch/yaw neu
+            // setzen (roll bleibt dabei IMMER 0). Das verhindert, dass ein
+            // einzelner fehlerhafter Touch-/Maus-Wert die Kamera dauerhaft
+            // "kippen" lässt, selbst wenn irgendwo ein Randfall übersehen wurde.
+            controls.pitch = Math.max(-Math.PI / 2 + 0.1, Math.min(Math.PI / 2 - 0.1, controls.pitch));
+            camera.rotation.set(controls.pitch, controls.yaw, 0, 'YXZ');
+
             if (controls.isLocked) {
                 animateSwing();
                 updateRaycast();
@@ -4607,15 +4619,21 @@
             renderer.render(scene, camera);
         }
 
-        // (getViewportSize ist bereits weiter oben definiert, direkt neben
-        // computeResponsiveFov, damit auch die initiale Kamera/Renderer-
-        // Erstellung sie nutzen kann.)
+        // (getViewportSize ist bereits weiter oben definiert, direkt neben der
+        // Kamera-Erstellung, damit beide dieselbe robuste Logik nutzen.)
 
         function handleViewportResize() {
             const size = getViewportSize();
-            if (size.width < 10 || size.height < 10) return; // unplausibler Zwischenwert, ignorieren
-            camera.aspect = size.width / size.height;
-            camera.fov = computeResponsiveFov();
+            if (size.width < 50 || size.height < 50) return; // unplausibler Zwischenwert, ignorieren
+
+            let aspect = size.width / size.height;
+            // Sicherheitsnetz: extrem verzerrte Zwischenzustände (z.B. während
+            // iOS/iPadOS kurzzeitig eine falsche Höhe meldet) sollen die Kamera
+            // nie sichtbar verzerren.
+            aspect = Math.max(0.3, Math.min(4, aspect));
+
+            camera.aspect = aspect;
+            camera.fov = FIXED_VERTICAL_FOV; // bewusst konstant, siehe Kommentar oben
             camera.updateProjectionMatrix();
             renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2.0));
             renderer.setSize(size.width, size.height, false);
